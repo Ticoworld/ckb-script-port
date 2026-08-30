@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "D2 RP2-A deterministic fixture manifest",
+  "type": "object",
+  "required": ["schema_version", "backend", "genesis_hash", "tip_height", "tip_hash", "script_a", "a_related_height", "unmatched_interval"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "backend": { "enum": ["rocksdb", "sqlite"] },
+    "genesis_hash": { "type": "string", "pattern": "^0x[0-9a-f]+$" },
+    "tip_height": { "type": "integer", "minimum": 1 },
+    "tip_hash": { "type": "string", "pattern": "^0x[0-9a-f]+$" },
+    "script_a": {
+      "type": "object",
+      "required": ["packed_hex", "script_hash", "role"],
+      "properties": {
+        "packed_hex": { "type": "string", "pattern": "^0x[0-9a-f]+$" },
+        "script_hash": { "type": "string", "pattern": "^0x[0-9a-f]+$" },
+        "role": { "const": "lock" }
+      },
+      "additionalProperties": false
+    },
+    "a_related_height": { "type": "integer", "minimum": 1 },
+    "unmatched_interval": {
+      "type": "object",
+      "required": ["start", "end"],
+      "properties": {
+        "start": { "type": "integer", "minimum": 1 },
+        "end": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "blocks": { "type": "array" }
+  },
+  "additionalProperties": false
+}

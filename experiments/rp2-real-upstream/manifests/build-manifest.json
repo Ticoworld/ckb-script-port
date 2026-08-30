@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "purpose": "RP2-A real-upstream build evidence",
+  "upstream": {
+    "repository": "https://github.com/nervosnetwork/ckb-light-client.git",
+    "revision": "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+    "branch_observed": "develop",
+    "cargo_lock_sha256": "F3A18D999A89519024B44B702C1637C571217CEB8D06CD7E39126E8D22EAE890",
+    "light_client_lib_version": "0.5.5",
+    "ckb_rocksdb": "0.21.1",
+    "rusqlite": "0.32",
+    "rust_toolchain_file": "1.95.0",
+    "rust_toolchain_used_by_rp2a": "stable / rustc 1.96.0 (ac68faa20 2026-05-25)"
+  },
+  "builds": [
+    {
+      "backend": "rocksdb",
+      "features": "default (rocksdb)",
+      "command": "cargo test --manifest-path light-client-lib/Cargo.toml --no-run --locked",
+      "target_dir": "_work/build/rocksdb",
+      "status": "success"
+    },
+    {
+      "backend": "sqlite",
+      "features": "--no-default-features --features sqlite",
+      "command": "cargo test --manifest-path light-client-lib/Cargo.toml --no-run --no-default-features --features sqlite --locked",
+      "target_dir": "_work/build/sqlite",
+      "status": "success"
+    }
+  ],
+  "notes": [
+    "The native backend is selected at compile time; RP2-A uses separate feature-specific builds.",
+    "This tracked manifest records commands and pin; per-machine artifact hashes belong in the ignored run/build-evidence.json.",
+    "The reproducible Windows setup used LIBCLANG_PATH pointing at libclang.runtime.win-x64 22.1.8 and CXXFLAGS=-D_WIN32_WINNT=0x0602 for the MinGW clang toolchain.",
+    "The SQLite test graph still compiles the upstream ckb-store development dependency and therefore native RocksDB; the light-client-lib feature selection remains SQLite."
+  ]
+}

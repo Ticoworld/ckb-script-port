@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "D2 RP2-A event",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "client_id",
+    "backend",
+    "sequence",
+    "event_type",
+    "origin",
+    "fields"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "client_id": { "type": "string", "minLength": 1 },
+    "backend": { "enum": ["rocksdb", "sqlite"] },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "event_type": { "type": "string", "minLength": 1 },
+    "origin": { "type": "string", "minLength": 1 },
+    "fields": { "type": "object" }
+  },
+  "additionalProperties": false
+}

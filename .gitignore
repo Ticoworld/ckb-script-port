@@ -23,6 +23,7 @@ experiments/rp2-real-upstream/**/generated/*.jsonl
 # Local editor and OS files
 .vscode/
 .idea/
+__pycache__/
 *.swp
 Thumbs.db
 Desktop.ini

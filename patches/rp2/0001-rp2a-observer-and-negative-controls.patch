@@ -1,0 +1,1342 @@
+diff --git a/light-client-lib/src/lib.rs b/light-client-lib/src/lib.rs
+index 3e2e940..078a29f 100644
+--- a/light-client-lib/src/lib.rs
++++ b/light-client-lib/src/lib.rs
+@@ -2,7 +2,10 @@
+ 
+ #[cfg(test)]
+ #[macro_use]
+-mod tests;
++pub(crate) mod tests;
++
++#[cfg(test)]
++pub(crate) mod rp2_observer;
+ 
+ pub mod error;
+ pub mod protocols;
+diff --git a/light-client-lib/src/protocols/filter/block_filter.rs b/light-client-lib/src/protocols/filter/block_filter.rs
+index 2475f96..ce68385 100644
+--- a/light-client-lib/src/protocols/filter/block_filter.rs
++++ b/light-client-lib/src/protocols/filter/block_filter.rs
+@@ -333,6 +333,17 @@ impl FilterProtocol {
+         peer: PeerIndex,
+         start_number: BlockNumber,
+     ) {
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "get_block_filters_requested",
++            serde_json::json!({
++                "peer": peer.to_string(),
++                "start": start_number,
++                "count": null,
++                "end": null,
++            }),
++            "normal_filter_scheduler",
++        );
+         debug!(
+             "request block filter from peer {}, starts at {}",
+             peer, start_number
+@@ -446,6 +457,17 @@ impl CKBProtocolHandler for FilterProtocol {
+ 
+         let item_name = msg.item_name();
+         let status = self.try_process(Arc::clone(&nc), peer, msg).await;
++        #[cfg(test)]
++        if item_name == "BlockFilters" && !status.is_ok() {
++            crate::rp2_observer::emit(
++                "block_filters_rejected",
++                serde_json::json!({
++                    "peer": peer.to_string(),
++                    "status": format!("{}", status),
++                }),
++                "normal_filter_scheduler",
++            );
++        }
+         status
+             .process(nc, &self.peers, peer, "BlockFilter", item_name)
+             .await;
+diff --git a/light-client-lib/src/protocols/filter/components/block_filters_process.rs b/light-client-lib/src/protocols/filter/components/block_filters_process.rs
+index a76a706..d068ab8 100644
+--- a/light-client-lib/src/protocols/filter/components/block_filters_process.rs
++++ b/light-client-lib/src/protocols/filter/components/block_filters_process.rs
+@@ -63,6 +63,18 @@ impl<'a> BlockFiltersProcess<'a> {
+         let filters_count = block_filters.filters().len();
+         let blocks_count = block_filters.block_hashes().len();
+ 
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "block_filters_received",
++            serde_json::json!({
++                "peer": self.peer.to_string(),
++                "start": start_number,
++                "count": filters_count,
++                "block_hash_count": blocks_count,
++            }),
++            "normal_filter_scheduler",
++        );
++
+         debug!(
+             "recieved block filters: start number: {start_number}, \
+             filters count: {filters_count}, blocks count: {blocks_count}."
+@@ -246,7 +258,29 @@ impl<'a> BlockFiltersProcess<'a> {
+             return StatusCode::Ignore.with_context(errmsg);
+         };
+ 
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "block_filters_accepted",
++            serde_json::json!({
++                "peer": self.peer.to_string(),
++                "start": start_number,
++                "count": actual_blocks_count,
++                "end": filtered_block_number,
++                "match_count": possible_match_blocks_len,
++            }),
++            "normal_filter_processing",
++        );
++
+         if possible_match_blocks_len != 0 {
++            #[cfg(test)]
++            crate::rp2_observer::emit(
++                "matched_blocks_requested",
++                serde_json::json!({
++                    "peer": self.peer.to_string(),
++                    "blocks": possible_match_blocks.iter().map(|hash| format!("{:#x}", hash)).collect::<Vec<_>>(),
++                }),
++                "normal_filter_processing",
++            );
+             let blocks = possible_match_blocks
+                 .iter()
+                 .map(|block_hash| (block_hash.clone(), block_hash == &prove_state_block_hash))
+diff --git a/light-client-lib/src/protocols/light_client/mod.rs b/light-client-lib/src/protocols/light_client/mod.rs
+index e6a309b..b3fdc37 100644
+--- a/light-client-lib/src/protocols/light_client/mod.rs
++++ b/light-client-lib/src/protocols/light_client/mod.rs
+@@ -397,6 +397,17 @@ impl LightClientProtocol {
+                 new_prove_state.get_last_headers(),
+             );
+         }
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "chain_authority_accepted",
++            serde_json::json!({
++                "genesis": format!("{:#x}", self.storage.get_genesis_block().calc_header_hash()),
++                "tip_number": new_prove_state.get_last_header().header().number(),
++                "tip_hash": format!("{:#x}", new_prove_state.get_last_header().header().hash()),
++                "total_difficulty": format!("{:#x}", new_total_difficulty),
++            }),
++            "normal_chain_proof",
++        );
+         self.peers()
+             .update_prove_state(peer_index, new_prove_state)?;
+         Ok(true)
+diff --git a/light-client-lib/src/protocols/synchronizer.rs b/light-client-lib/src/protocols/synchronizer.rs
+index 740bd1e..98eb52a 100644
+--- a/light-client-lib/src/protocols/synchronizer.rs
++++ b/light-client-lib/src/protocols/synchronizer.rs
+@@ -73,6 +73,19 @@ impl CKBProtocolHandler for SyncProtocol {
+                 let new_block = reader.to_entity().block();
+                 let block_hash = new_block.header().calc_header_hash();
+                 let block_hash_key = block_hash.unpack();
++                #[cfg(test)]
++                {
++                    let block_number: u64 = new_block.header().raw().number().unpack();
++                    crate::rp2_observer::emit(
++                        "matched_block_received",
++                        serde_json::json!({
++                            "peer": peer.to_string(),
++                            "block": block_number,
++                            "hash": format!("{:#x}", block_hash),
++                        }),
++                        "normal_synchronizer",
++                    );
++                }
+                 let mut body_validated = false;
+                 // The proof state can change after releasing the read lock. Recheck it
+                 // under the write lock and validate before caching if it became proved.
+diff --git a/light-client-lib/src/rp2_observer.rs b/light-client-lib/src/rp2_observer.rs
+new file mode 100644
+index 0000000..f390cdd
+--- /dev/null
++++ b/light-client-lib/src/rp2_observer.rs
+@@ -0,0 +1,110 @@
++//! Test-only structured observation for the RP2-A authority/replay harness.
++//!
++//! This module is compiled only for tests. It records observations made at
++//! real upstream protocol/storage boundaries and does not change decisions.
++
++use serde::Serialize;
++use serde_json::Value;
++use std::cell::RefCell;
++use std::fs::{create_dir_all, File};
++use std::io::{self, BufWriter, Write};
++use std::path::Path;
++use std::sync::{Mutex, OnceLock};
++
++const SCHEMA_VERSION: u32 = 1;
++
++#[derive(Serialize)]
++struct EventRecord {
++    schema_version: u32,
++    run_id: String,
++    client_id: String,
++    backend: String,
++    sequence: u64,
++    event_type: String,
++    origin: String,
++    fields: Value,
++}
++
++struct EventWriter {
++    run_id: String,
++    client_id: String,
++    backend: String,
++    sequence: u64,
++    writer: BufWriter<File>,
++}
++
++static WRITER: OnceLock<Mutex<Option<EventWriter>>> = OnceLock::new();
++
++thread_local! {
++    static ORIGIN: RefCell<Option<String>> = const { RefCell::new(None) };
++}
++
++fn writer() -> &'static Mutex<Option<EventWriter>> {
++    WRITER.get_or_init(|| Mutex::new(None))
++}
++
++pub(crate) fn start<P: AsRef<Path>>(
++    path: P,
++    run_id: impl Into<String>,
++    client_id: impl Into<String>,
++    backend: impl Into<String>,
++) -> io::Result<()> {
++    if let Some(parent) = path.as_ref().parent() {
++        create_dir_all(parent)?;
++    }
++    let file = File::create(path)?;
++    *writer().lock().expect("RP2 observer lock") = Some(EventWriter {
++        run_id: run_id.into(),
++        client_id: client_id.into(),
++        backend: backend.into(),
++        sequence: 0,
++        writer: BufWriter::new(file),
++    });
++    Ok(())
++}
++
++pub(crate) fn finish() -> io::Result<()> {
++    let mut guard = writer().lock().expect("RP2 observer lock");
++    if let Some(mut event_writer) = guard.take() {
++        event_writer.writer.flush()?;
++    }
++    Ok(())
++}
++
++pub(crate) fn with_origin<R>(origin: &str, f: impl FnOnce() -> R) -> R {
++    let previous = ORIGIN.with(|cell| cell.replace(Some(origin.to_owned())));
++    let result = f();
++    ORIGIN.with(|cell| {
++        cell.replace(previous);
++    });
++    result
++}
++
++pub(crate) fn current_origin(default: &str) -> String {
++    ORIGIN
++        .with(|cell| cell.borrow().clone())
++        .unwrap_or_else(|| default.to_owned())
++}
++
++pub(crate) fn emit(event_type: &str, fields: Value, default_origin: &str) {
++    let mut guard = writer().lock().expect("RP2 observer lock");
++    let Some(event_writer) = guard.as_mut() else {
++        return;
++    };
++    event_writer.sequence += 1;
++    let record = EventRecord {
++        schema_version: SCHEMA_VERSION,
++        run_id: event_writer.run_id.clone(),
++        client_id: event_writer.client_id.clone(),
++        backend: event_writer.backend.clone(),
++        sequence: event_writer.sequence,
++        event_type: event_type.to_owned(),
++        origin: current_origin(default_origin),
++        fields,
++    };
++    serde_json::to_writer(&mut event_writer.writer, &record).expect("write RP2 event");
++    event_writer
++        .writer
++        .write_all(b"\n")
++        .expect("write RP2 event newline");
++}
+diff --git a/light-client-lib/src/storage/storage_trait.rs b/light-client-lib/src/storage/storage_trait.rs
+index d562a63..0d8770f 100644
+--- a/light-client-lib/src/storage/storage_trait.rs
++++ b/light-client-lib/src/storage/storage_trait.rs
+@@ -81,6 +81,14 @@ pub trait LightClientStorage: StorageBackend {
+ 
+     /// Update filter scripts
+     fn update_filter_scripts(&self, scripts: Vec<ScriptStatus>, command: SetScriptsCommand) {
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "script_registration_started",
++            serde_json::json!({
++                "script_count": scripts.len(),
++            }),
++            "registration",
++        );
+         let mut should_filter_genesis_block = false;
+         let mut batch = self.batch();
+         let key_prefix = Key::Meta(FILTER_SCRIPTS_KEY).into_vec();
+@@ -166,6 +174,15 @@ pub trait LightClientStorage: StorageBackend {
+             let block = self.get_genesis_block();
+             self.filter_block(block);
+         }
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "script_registration_completed",
++            serde_json::json!({
++                "script_count": self.get_filter_scripts().len(),
++                "min_filtered": self.get_min_filtered_block_number(),
++            }),
++            "registration",
++        );
+     }
+ 
+     /// Get scripts hash by block number
+@@ -199,6 +216,20 @@ pub trait LightClientStorage: StorageBackend {
+ 
+     /// Update block number for filter scripts
+     fn update_block_number(&self, block_number: BlockNumber) {
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "script_progress_before",
++            serde_json::json!({
++                "requested_block": block_number,
++                "scripts": self.get_filter_scripts().iter().map(|script| {
++                    serde_json::json!({
++                        "script_hash": format!("{:#x}", script.script.calc_script_hash()),
++                        "block": script.block_number,
++                    })
++                }).collect::<Vec<_>>(),
++            }),
++            "normal_filter_processing",
++        );
+         let key_prefix = Key::Meta(FILTER_SCRIPTS_KEY).into_vec();
+         let key_prefix_clone = key_prefix.clone();
+         let results = self.collect_iterator(
+@@ -219,6 +250,20 @@ pub trait LightClientStorage: StorageBackend {
+             }
+         }
+         batch.commit().expect("batch commit should be ok");
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "script_progress_after",
++            serde_json::json!({
++                "requested_block": block_number,
++                "scripts": self.get_filter_scripts().iter().map(|script| {
++                    serde_json::json!({
++                        "script_hash": format!("{:#x}", script.script.calc_script_hash()),
++                        "block": script.block_number,
++                    })
++                }).collect::<Vec<_>>(),
++            }),
++            "normal_filter_processing",
++        );
+     }
+ 
+     // ========== Matched blocks management ==========
+@@ -504,6 +549,19 @@ pub trait LightClientStorage: StorageBackend {
+     /// - Records transaction history for matched scripts
+     /// - Stores the matched transactions
+     fn filter_block(&self, block: Block) {
++        #[cfg(test)]
++        {
++            let block_number: u64 = block.header().raw().number().unpack();
++            crate::rp2_observer::emit(
++                "filter_block_entered",
++                serde_json::json!({
++                    "block": block_number,
++                    "hash": format!("{:#x}", block.calc_header_hash()),
++                    "transactions": block.transactions().len(),
++                }),
++                "normal_filter_processing",
++            );
++        }
+         let scripts: HashSet<(packed::Script, ScriptType)> = self
+             .get_filter_scripts()
+             .into_iter()
+@@ -681,6 +739,12 @@ pub trait LightClientStorage: StorageBackend {
+     ///
+     /// N.B. The specified block will be removed.
+     fn rollback_to_block(&self, to_number: BlockNumber) {
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "rollback_started",
++            serde_json::json!({"to_number": to_number}),
++            "rollback",
++        );
+         use super::extract_raw_data;
+ 
+         let scripts = self.get_filter_scripts();
+@@ -841,6 +905,15 @@ pub trait LightClientStorage: StorageBackend {
+         }
+ 
+         batch.commit().expect("batch commit should be ok");
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "rollback_completed",
++            serde_json::json!({
++                "to_number": to_number,
++                "min_filtered": self.get_min_filtered_block_number(),
++            }),
++            "rollback",
++        );
+     }
+ 
+     /// Get transaction with header by transaction hash
+@@ -929,10 +1002,22 @@ pub trait LightClientStorage: StorageBackend {
+ 
+     /// Update minimum filtered block number
+     fn update_min_filtered_block_number(&self, block_number: BlockNumber) {
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "min_filtered_before",
++            serde_json::json!({"block_number": self.get_min_filtered_block_number()}),
++            "normal_filter_processing",
++        );
+         let key = Key::Meta(MIN_FILTERED_BLOCK_NUMBER).into_vec();
+         let value = block_number.to_le_bytes().to_vec();
+         StorageBackend::put(self, key, value)
+             .expect("db put min filtered block number should be ok");
++        #[cfg(test)]
++        crate::rp2_observer::emit(
++            "min_filtered_after",
++            serde_json::json!({"block_number": block_number}),
++            "normal_filter_processing",
++        );
+     }
+ 
+     // ========== Additional methods ==========
+diff --git a/light-client-lib/src/tests/mod.rs b/light-client-lib/src/tests/mod.rs
+index f7b5d6a..9f3dcfc 100644
+--- a/light-client-lib/src/tests/mod.rs
++++ b/light-client-lib/src/tests/mod.rs
+@@ -3,6 +3,8 @@ mod prelude;
+ 
+ pub(crate) mod utils;
+ 
++mod rp2_authority_replay;
++
+ // The unit tests for modules which are in the root path of this crate.
+ mod protocols;
+ mod storage;
+diff --git a/light-client-lib/src/tests/rp2_authority_replay.rs b/light-client-lib/src/tests/rp2_authority_replay.rs
+new file mode 100644
+index 0000000..03be6cd
+--- /dev/null
++++ b/light-client-lib/src/tests/rp2_authority_replay.rs
+@@ -0,0 +1,890 @@
++//! RP2-A: real-upstream authority and replay measurement harness.
++//!
++//! This module is test-only. It deliberately contains no D2 importer. The
++//! normal control drives the actual filter/proof/synchronizer path; the
++//! adversarial controls use direct writes only to prove that the verifier can
++//! identify those shortcuts.
++
++use std::{fs, path::PathBuf, sync::Arc};
++
++use ckb_network::{CKBProtocolHandler, PeerIndex, SupportProtocols};
++use ckb_store::ChainStore;
++use ckb_types::{
++    bytes::Bytes,
++    core::{BlockNumber, BlockView, ScriptHashType},
++    packed::{self, Script},
++    prelude::*,
++};
++use serde_json::{json, Value};
++
++use crate::{
++    protocols::{
++        FilterProtocol, LastState, LightClientProtocol, PendingTxs, SyncProtocol,
++        GET_BLOCK_FILTERS_TOKEN,
++    },
++    rp2_observer,
++    service::{
++        LightClientChainService, ScriptStatus as ServiceScriptStatus,
++        ScriptType as ServiceScriptType, SetScriptsCommand as ServiceSetScriptsCommand,
++    },
++    storage::{
++        IteratorDirection, IteratorStart, LightClientStorage, ScriptStatus as StorageScriptStatus,
++        ScriptType as StorageScriptType, SetScriptsCommand, Storage, StorageBackend,
++        StorageWithChainData,
++    },
++    tests::{
++        prelude::*,
++        utils::{setup, MockChain, MockNetworkContext, MockRunningChain},
++        ALWAYS_SUCCESS_SCRIPT,
++    },
++};
++
++const TIP_HEIGHT: BlockNumber = 36;
++const LAST_N_BLOCKS: BlockNumber = 3;
++
++#[cfg(feature = "sqlite")]
++const BACKEND: &str = "sqlite";
++#[cfg(not(feature = "sqlite"))]
++const BACKEND: &str = "rocksdb";
++
++struct EventSession;
++
++impl Drop for EventSession {
++    fn drop(&mut self) {
++        let _ = rp2_observer::finish();
++    }
++}
++
++fn event_dir() -> PathBuf {
++    std::env::var_os("RP2_EVENT_DIR")
++        .map(PathBuf::from)
++        .unwrap_or_else(|| std::env::temp_dir().join("d2-rp2a-events"))
++}
++
++fn run_root() -> PathBuf {
++    std::env::var_os("RP2_RUN_ROOT")
++        .map(PathBuf::from)
++        .unwrap_or_else(|| std::env::temp_dir().join("d2-rp2a-run"))
++}
++
++fn start_events(
++    case: &str,
++    expected_classification: &str,
++    requires_authority: bool,
++) -> EventSession {
++    let run_id = format!("rp2a-{}-{}", BACKEND, case);
++    let path = event_dir().join(format!("{}-{}.jsonl", BACKEND, case));
++    rp2_observer::start(&path, run_id, case, BACKEND).expect("start RP2 event log");
++    rp2_observer::emit(
++        "case_started",
++        json!({
++            "case": case,
++            "expected_classification": expected_classification,
++            "requires_authority": requires_authority,
++        }),
++        "harness",
++    );
++    EventSession
++}
++
++fn hex(bytes: &[u8]) -> String {
++    const DIGITS: &[u8; 16] = b"0123456789abcdef";
++    let mut output = String::with_capacity(2 + bytes.len() * 2);
++    output.push_str("0x");
++    for byte in bytes {
++        output.push(DIGITS[(byte >> 4) as usize] as char);
++        output.push(DIGITS[(byte & 0xf) as usize] as char);
++    }
++    output
++}
++
++fn script_a() -> Script {
++    Script::new_builder()
++        .code_hash(packed::Byte32::from_slice(&[0x42u8; 32]).unwrap())
++        .build()
++}
++
++struct Fixture {
++    chain: MockRunningChain,
++    script: Script,
++    a_related_height: BlockNumber,
++    tip_height: BlockNumber,
++}
++
++fn deterministic_timestamped_block(block: packed::Block) -> BlockView {
++    let number: u64 = block.header().raw().number().unpack();
++    block
++        .as_advanced_builder()
++        .timestamp(1_000u64 + number)
++        .build()
++}
++
++fn write_fixture_manifest(
++    chain: &MockRunningChain,
++    script: &Script,
++    a_related_height: BlockNumber,
++) {
++    let snapshot = chain.shared().snapshot();
++    let blocks = (0..=TIP_HEIGHT)
++        .map(|number| {
++            let block = snapshot
++                .get_block_by_number(number)
++                .expect("fixture block stored");
++            json!({
++                "height": number,
++                "hash": format!("{:#x}", block.hash()),
++                "parent": format!("{:#x}", block.header().parent_hash()),
++                "transactions": block.transactions().len(),
++            })
++        })
++        .collect::<Vec<_>>();
++    let genesis = snapshot.get_block_by_number(0).expect("genesis stored");
++    let manifest = json!({
++        "schema_version": 1,
++        "backend": BACKEND,
++        "genesis_hash": format!("{:#x}", genesis.hash()),
++        "tip_height": TIP_HEIGHT,
++        "tip_hash": format!("{:#x}", snapshot.get_block_hash(TIP_HEIGHT).expect("tip stored")),
++        "script_a": {
++            "packed_hex": hex(script.as_slice()),
++            "script_hash": format!("{:#x}", script.calc_script_hash()),
++            "role": "lock",
++        },
++        "a_related_height": a_related_height,
++        "unmatched_interval": {"start": 1, "end": a_related_height - 1},
++        "blocks": blocks,
++        "chain_kind": "upstream MockRunningChain dummy-PoW dev fixture",
++    });
++    let path = run_root()
++        .join("fixture")
++        .join(format!("manifest-{}.json", BACKEND));
++    fs::create_dir_all(path.parent().expect("manifest parent")).expect("create manifest directory");
++    fs::write(
++        path,
++        serde_json::to_vec_pretty(&manifest).expect("serialize manifest"),
++    )
++    .expect("write fixture manifest");
++    rp2_observer::emit("fixture_manifest_written", manifest, "fixture");
++}
++
++fn make_fixture() -> Fixture {
++    let script = script_a();
++    let chain = MockChain::new_with_dummy_pow("rp2a-fixture").start();
++    for _ in 1..=28 {
++        chain.mine_block(deterministic_timestamped_block);
++    }
++
++    let tx = {
++        let tx = chain.get_cellbase_as_input(26);
++        let output = tx
++            .output(0)
++            .expect("cellbase output")
++            .as_builder()
++            .lock(script.clone())
++            .build();
++        tx.as_advanced_builder().set_outputs(vec![output]).build()
++    };
++    chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + number)
++            .proposals(vec![tx.proposal_short_id()])
++            .build()
++    });
++    chain.mine_block(deterministic_timestamped_block);
++    let a_related_height = chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + number)
++            .transaction(tx.clone())
++            .build()
++    });
++    for _ in (a_related_height + 1)..=TIP_HEIGHT {
++        chain.mine_block(deterministic_timestamped_block);
++    }
++    write_fixture_manifest(&chain, &script, a_related_height);
++    Fixture {
++        chain,
++        script,
++        a_related_height,
++        tip_height: TIP_HEIGHT,
++    }
++}
++
++fn register_script_through_service(
++    chain: &MockRunningChain,
++    peers: Arc<crate::protocols::Peers>,
++    script: &Script,
++) {
++    let pending_txs = Arc::new(std::sync::RwLock::new(PendingTxs::default()));
++    let swc = StorageWithChainData::new(chain.client_storage().clone(), peers, pending_txs);
++    let service = LightClientChainService::new(swc, Arc::new(chain.consensus().clone()));
++    service.set_scripts(
++        vec![ServiceScriptStatus {
++            script: script.clone().into(),
++            script_type: ServiceScriptType::Lock,
++            block_number: 0.into(),
++        }],
++        Some(ServiceSetScriptsCommand::All),
++    );
++}
++
++async fn establish_authority(
++    chain: &MockRunningChain,
++    protocol: &mut LightClientProtocol,
++    nc: &MockNetworkContext,
++    peer_index: PeerIndex,
++    tip_height: BlockNumber,
++) -> AuthorityReceipt {
++    protocol.set_last_n_blocks(LAST_N_BLOCKS);
++    let snapshot = chain.shared().snapshot();
++    let prove_request = chain.build_prove_request(0, tip_height, &[], 0, protocol.last_n_blocks());
++    let last_state = LastState::new(prove_request.get_last_header().to_owned());
++    protocol
++        .peers()
++        .update_last_state(peer_index, last_state)
++        .expect("seed peer last state request");
++    protocol
++        .peers()
++        .update_prove_request(peer_index, prove_request)
++        .expect("seed peer proof request");
++
++    let last_header = snapshot
++        .get_verifiable_header_by_number(tip_height)
++        .expect("authority tip stored");
++    let headers = (0..tip_height)
++        .map(|number| {
++            snapshot
++                .get_verifiable_header_by_number(number)
++                .expect("authority header stored")
++        })
++        .collect::<Vec<_>>();
++    let numbers = headers
++        .iter()
++        .map(|header| header.header().raw().number().unpack())
++        .collect::<Vec<_>>();
++    let proof = chain.build_proof_by_numbers(tip_height, &numbers);
++    let message = packed::LightClientMessage::new_builder()
++        .set(
++            packed::SendLastStateProof::new_builder()
++                .last_header(last_header.clone())
++                .proof(proof)
++                .headers(headers.pack())
++                .build(),
++        )
++        .build();
++    protocol
++        .received(nc.context(), peer_index, message.as_bytes())
++        .await;
++    assert!(nc.not_banned(peer_index), "authority proof was rejected");
++    assert!(
++        protocol
++            .get_peer_state(&peer_index)
++            .expect("authority peer")
++            .get_prove_state()
++            .is_some(),
++        "authority proof did not produce prove state"
++    );
++
++    AuthorityReceipt {
++        genesis: snapshot.get_block_by_number(0).expect("genesis").hash(),
++        height: tip_height,
++        hash: last_header.header().calc_header_hash(),
++    }
++}
++
++#[derive(Clone)]
++struct AuthorityReceipt {
++    genesis: packed::Byte32,
++    height: BlockNumber,
++    hash: packed::Byte32,
++}
++
++#[derive(Clone)]
++struct HandoffClaim {
++    script: Script,
++    lock_role: bool,
++    height: BlockNumber,
++    hash: packed::Byte32,
++    genesis: packed::Byte32,
++}
++
++fn validate_claim(
++    storage: &Storage,
++    receipt: Option<&AuthorityReceipt>,
++    claim: &HandoffClaim,
++    expected_script: &Script,
++    expected_lock_role: bool,
++) -> Result<(), String> {
++    if &claim.script != expected_script {
++        return Err("packed Script mismatch".to_owned());
++    }
++    if claim.lock_role != expected_lock_role {
++        return Err("Script role mismatch".to_owned());
++    }
++    let receipt =
++        receipt.ok_or_else(|| "destination has no independently accepted proof".to_owned())?;
++    if claim.genesis != receipt.genesis {
++        return Err("genesis mismatch".to_owned());
++    }
++    if claim.height > receipt.height {
++        return Err("progress exceeds verified destination height".to_owned());
++    }
++    if claim.height != receipt.height || claim.hash != receipt.hash {
++        return Err("handoff hash/height does not match verified destination authority".to_owned());
++    }
++    let storage_tip = storage.get_tip_header();
++    let storage_height: BlockNumber = storage_tip.raw().number().unpack();
++    if storage_height != receipt.height || storage_tip.calc_header_hash() != receipt.hash {
++        return Err("persistent destination tip disagrees with proof receipt".to_owned());
++    }
++    Ok(())
++}
++
++fn authority_fingerprint(storage: &Storage) -> Value {
++    let rows = storage
++        .collect_iterator(
++            IteratorStart::From(Vec::new()),
++            IteratorDirection::Forward,
++            Box::new(|_| true),
++            Box::new(|_, value| Some(value.to_vec())),
++            usize::MAX,
++        )
++        .into_iter()
++        .filter(|row| row.key.first().is_some_and(|tag| *tag >= 160))
++        .map(|row| json!({"key": hex(&row.key), "value": hex(&row.value)}))
++        .collect::<Vec<_>>();
++    json!({"authority_rows": rows})
++}
++
++fn record_fingerprint(stage: &str, fingerprint: &Value) {
++    rp2_observer::emit(
++        "authority_fingerprint",
++        json!({"stage": stage, "fingerprint": fingerprint}),
++        "authority_observer",
++    );
++}
++
++fn write_result(name: &str, value: Value) {
++    let path = run_root()
++        .join("results")
++        .join(format!("{}-{}.json", BACKEND, name));
++    fs::create_dir_all(path.parent().expect("result parent")).expect("create result directory");
++    fs::write(
++        path,
++        serde_json::to_vec_pretty(&value).expect("serialize RP2 result"),
++    )
++    .expect("write RP2 result");
++}
++
++fn filter_request_starts(nc: &MockNetworkContext) -> Vec<BlockNumber> {
++    nc.sent_messages()
++        .borrow()
++        .iter()
++        .filter_map(|(_, _, data)| {
++            let message = packed::BlockFilterMessageReader::from_slice(data).ok()?;
++            match message.to_enum() {
++                packed::BlockFilterMessageUnionReader::GetBlockFilters(content) => {
++                    Some(content.start_number().unpack())
++                }
++                _ => None,
++            }
++        })
++        .collect()
++}
++
++async fn feed_filter_range(
++    chain: &MockRunningChain,
++    filter: &mut FilterProtocol,
++    peers: &Arc<crate::protocols::Peers>,
++    nc: &MockNetworkContext,
++    peer_index: PeerIndex,
++    start: BlockNumber,
++    end: BlockNumber,
++    tip_height: BlockNumber,
++) {
++    let snapshot = chain.shared().snapshot();
++    let mut filter_hashes = snapshot
++        .get_block_filter_hashes_until(tip_height)
++        .expect("filter hashes");
++    filter_hashes.remove(0);
++    peers.mock_latest_block_filter_hashes(peer_index, 0, filter_hashes);
++    let block_hashes = (start..=end)
++        .map(|number| snapshot.get_block_hash(number).expect("filter block hash"))
++        .collect::<Vec<_>>();
++    let filters = (start..=end)
++        .map(|number| snapshot.get_block_filter_data(number).expect("filter data"))
++        .collect::<Vec<_>>();
++    let content = packed::BlockFilterMessage::new_builder()
++        .set(
++            packed::BlockFilters::new_builder()
++                .start_number(start)
++                .block_hashes(block_hashes.pack())
++                .filters(filters.pack())
++                .build(),
++        )
++        .build();
++    filter
++        .received(nc.context(), peer_index, content.as_bytes())
++        .await;
++}
++
++async fn finish_matched_block(
++    chain: &MockRunningChain,
++    light_client: &mut LightClientProtocol,
++    sync: &mut SyncProtocol,
++    nc: &MockNetworkContext,
++    peer_index: PeerIndex,
++    matched_height: BlockNumber,
++    tip_height: BlockNumber,
++) {
++    let snapshot = chain.shared().snapshot();
++    let last_header = snapshot
++        .get_verifiable_header_by_number(tip_height)
++        .expect("proof tip");
++    let headers = vec![snapshot
++        .get_header_by_number(matched_height)
++        .expect("matched header")
++        .data()];
++    let proof = chain.build_proof_by_numbers(tip_height, &[matched_height]);
++    let proof_message = packed::LightClientMessage::new_builder()
++        .set(
++            packed::SendBlocksProof::new_builder()
++                .last_header(last_header)
++                .proof(proof)
++                .headers(headers.pack())
++                .build(),
++        )
++        .build();
++    light_client
++        .received(nc.context(), peer_index, proof_message.as_bytes())
++        .await;
++    assert!(
++        nc.not_banned(peer_index),
++        "matched block proof was rejected"
++    );
++
++    let block = snapshot
++        .get_block_by_number(matched_height)
++        .expect("matched block")
++        .data();
++    let sync_message = packed::SyncMessage::new_builder()
++        .set(packed::SendBlock::new_builder().block(block).build())
++        .build();
++    sync.received(nc.context(), peer_index, sync_message.as_bytes())
++        .await;
++    assert!(
++        nc.not_banned(peer_index),
++        "matched block was rejected by sync"
++    );
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2a_real_backend_baseline() {
++    setup();
++    let _events = start_events("baseline", "NORMAL_FILTERED", true);
++    let fixture = make_fixture();
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture
++        .chain
++        .create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(
++        &fixture.chain,
++        &mut light_client,
++        &nc,
++        peer_index,
++        fixture.tip_height,
++    )
++    .await;
++    register_script_through_service(&fixture.chain, Arc::clone(&peers), &fixture.script);
++
++    let mut filter = fixture.chain.create_filter_protocol(Arc::clone(&peers));
++    let mut sync = fixture.chain.create_sync_protocol(Arc::clone(&peers));
++    let filter_nc = MockNetworkContext::new(SupportProtocols::Filter);
++    let sync_nc = MockNetworkContext::new(SupportProtocols::Sync);
++    let snapshot = fixture.chain.shared().snapshot();
++    let mut filter_hashes = snapshot
++        .get_block_filter_hashes_until(fixture.tip_height)
++        .expect("fixture filter hashes");
++    filter_hashes.remove(0);
++    peers.mock_latest_block_filter_hashes(peer_index, 0, filter_hashes);
++
++    filter
++        .notify(filter_nc.context(), GET_BLOCK_FILTERS_TOKEN)
++        .await;
++    let first_starts = filter_request_starts(&filter_nc);
++    assert!(
++        first_starts.contains(&1),
++        "real scheduler did not request block 1"
++    );
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        1,
++        fixture.a_related_height - 1,
++        fixture.tip_height,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        fixture.a_related_height,
++        fixture.tip_height,
++        fixture.tip_height,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        fixture.a_related_height,
++        fixture.tip_height,
++    )
++    .await;
++
++    let scripts = fixture.chain.client_storage().get_filter_scripts();
++    assert_eq!(scripts.len(), 1);
++    assert_eq!(scripts[0].block_number, fixture.tip_height);
++    assert_eq!(
++        fixture
++            .chain
++            .client_storage()
++            .get_min_filtered_block_number(),
++        fixture.tip_height
++    );
++    let fingerprint = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("baseline_after_normal_protocol", &fingerprint);
++    rp2_observer::emit(
++        "baseline_summary",
++        json!({
++            "backend": BACKEND,
++            "tip_height": fixture.tip_height,
++            "a_related_height": fixture.a_related_height,
++            "authority_height": receipt.height,
++            "script_progress": scripts[0].block_number,
++            "filter_requests": filter_request_starts(&filter_nc),
++            "unmatched_interval": {"start": 1, "end": fixture.a_related_height - 1},
++        }),
++        "harness",
++    );
++    write_result(
++        "baseline",
++        json!({
++            "case": "baseline",
++            "backend": BACKEND,
++            "authority": {"height": receipt.height, "hash": format!("{:#x}", receipt.hash)},
++            "script_progress": scripts[0].block_number,
++            "min_filtered": fixture.chain.client_storage().get_min_filtered_block_number(),
++        }),
++    );
++}
++
++#[test]
++fn rp2a_direct_script_cursor_is_not_legitimate() {
++    let _events = start_events("adv-1-direct-cursor", "DIRECT_PROGRESS_MUTATION", false);
++    let fixture = make_fixture();
++    let claim = StorageScriptStatus {
++        script: fixture.script.clone(),
++        script_type: StorageScriptType::Lock,
++        block_number: fixture.tip_height,
++    };
++    rp2_observer::with_origin("adversarial_direct_mutation", || {
++        fixture
++            .chain
++            .client_storage()
++            .update_filter_scripts(vec![claim], SetScriptsCommand::All);
++    });
++    assert_eq!(
++        fixture.chain.client_storage().get_filter_scripts()[0].block_number,
++        fixture.tip_height
++    );
++    rp2_observer::emit(
++        "direct_progress_mutation",
++        json!({"kind": "script_cursor", "height": fixture.tip_height}),
++        "adversarial_direct_mutation",
++    );
++}
++
++#[test]
++fn rp2a_direct_minimum_is_not_legitimate() {
++    let _events = start_events("adv-2-direct-minimum", "DIRECT_PROGRESS_MUTATION", false);
++    let fixture = make_fixture();
++    rp2_observer::with_origin("adversarial_direct_mutation", || {
++        fixture
++            .chain
++            .client_storage()
++            .update_min_filtered_block_number(fixture.tip_height);
++    });
++    assert_eq!(
++        fixture
++            .chain
++            .client_storage()
++            .get_min_filtered_block_number(),
++        fixture.tip_height
++    );
++    rp2_observer::emit(
++        "direct_progress_mutation",
++        json!({"kind": "min_filtered_number", "height": fixture.tip_height}),
++        "adversarial_direct_mutation",
++    );
++}
++
++#[test]
++fn rp2a_rows_without_coverage_are_not_skipped_history() {
++    let _events = start_events("adv-4-rows-only", "ROWS_ONLY", false);
++    let fixture = make_fixture();
++    let claim = StorageScriptStatus {
++        script: fixture.script.clone(),
++        script_type: StorageScriptType::Lock,
++        block_number: 0,
++    };
++    rp2_observer::with_origin("adversarial_direct_mutation", || {
++        fixture
++            .chain
++            .client_storage()
++            .update_filter_scripts(vec![claim], SetScriptsCommand::All);
++    });
++    let block = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_block_by_number(fixture.a_related_height)
++        .expect("A block")
++        .data();
++    rp2_observer::with_origin("adversarial_direct_mutation", || {
++        fixture.chain.client_storage().filter_block(block);
++    });
++    assert_eq!(
++        fixture.chain.client_storage().get_filter_scripts()[0].block_number,
++        0
++    );
++    rp2_observer::emit(
++        "rows_only_shortcut",
++        json!({
++            "script_hash": format!("{:#x}", fixture.script.calc_script_hash()),
++            "rows_written_without_filter_range": true,
++        }),
++        "adversarial_direct_mutation",
++    );
++}
++
++#[test]
++fn rp2a_manual_tip_mutation_is_authority_invalid() {
++    let _events = start_events("adv-3-manual-tip", "AUTHORITY_INVALID", true);
++    let fixture = make_fixture();
++    let storage = fixture.chain.client_storage();
++    let before = authority_fingerprint(storage);
++    record_fingerprint("before_direct_tip_mutation", &before);
++    let tip = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_header_by_number(fixture.tip_height)
++        .expect("fixture tip")
++        .data();
++    let mut value = vec![0u8; 32];
++    value.extend_from_slice(tip.as_slice());
++    let mut key = vec![224u8];
++    key.extend_from_slice(b"LAST_STATE");
++    rp2_observer::with_origin("adversarial_direct_mutation", || {
++        StorageBackend::put(storage, key, value).expect("tamper tip");
++    });
++    let after = authority_fingerprint(storage);
++    record_fingerprint("after_direct_tip_mutation", &after);
++    assert_ne!(
++        before, after,
++        "tip mutation must alter authority fingerprint"
++    );
++    rp2_observer::emit(
++        "direct_authority_mutation",
++        json!({"kind": "LAST_STATE", "height": fixture.tip_height}),
++        "adversarial_direct_mutation",
++    );
++    assert!(
++        validate_claim(
++            storage,
++            None,
++            &HandoffClaim {
++                script: fixture.script.clone(),
++                lock_role: true,
++                height: fixture.tip_height,
++                hash: tip.calc_header_hash(),
++                genesis: fixture.chain.consensus().genesis_block().hash(),
++            },
++            &fixture.script,
++            true,
++        )
++        .is_err(),
++        "manual tip must not create an authority receipt"
++    );
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2a_chain_binding_rejects_wrong_hash_genesis_role_and_height() {
++    setup();
++    let _events = start_events("adv-5-8-chain-binding", "AUTHORITY_INVALID", true);
++    let fixture = make_fixture();
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut protocol = fixture
++        .chain
++        .create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(
++        &fixture.chain,
++        &mut protocol,
++        &nc,
++        peer_index,
++        fixture.tip_height,
++    )
++    .await;
++    let before = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("before_rejected_claims", &before);
++    let expected_genesis = receipt.genesis.clone();
++    let cases = vec![
++        (
++            "same_height_wrong_hash",
++            HandoffClaim {
++                script: fixture.script.clone(),
++                lock_role: true,
++                height: receipt.height,
++                hash: packed::Byte32::from_slice(&[1u8; 32]).unwrap(),
++                genesis: expected_genesis.clone(),
++            },
++        ),
++        (
++            "wrong_genesis",
++            HandoffClaim {
++                script: fixture.script.clone(),
++                lock_role: true,
++                height: receipt.height,
++                hash: receipt.hash.clone(),
++                genesis: packed::Byte32::from_slice(&[2u8; 32]).unwrap(),
++            },
++        ),
++        (
++            "cursor_beyond_verified",
++            HandoffClaim {
++                script: fixture.script.clone(),
++                lock_role: true,
++                height: receipt.height + 1,
++                hash: receipt.hash.clone(),
++                genesis: expected_genesis.clone(),
++            },
++        ),
++        (
++            "wrong_role",
++            HandoffClaim {
++                script: fixture.script.clone(),
++                lock_role: false,
++                height: receipt.height,
++                hash: receipt.hash.clone(),
++                genesis: expected_genesis.clone(),
++            },
++        ),
++        (
++            "wrong_script",
++            HandoffClaim {
++                script: Script::new_builder()
++                    .code_hash(ALWAYS_SUCCESS_SCRIPT.code_hash())
++                    .hash_type(ScriptHashType::Data)
++                    .args(Bytes::from_static(b"wrong-script").pack())
++                    .build(),
++                lock_role: true,
++                height: receipt.height,
++                hash: receipt.hash.clone(),
++                genesis: expected_genesis,
++            },
++        ),
++    ];
++    let case_count = cases.len();
++    for (name, claim) in cases {
++        let result = validate_claim(
++            fixture.chain.client_storage(),
++            Some(&receipt),
++            &claim,
++            &fixture.script,
++            true,
++        );
++        assert!(
++            result.is_err(),
++            "adversarial claim unexpectedly accepted: {name}"
++        );
++        rp2_observer::emit(
++            "handoff_validation_rejected",
++            json!({"case": name, "reason": result.unwrap_err()}),
++            "approved_validation",
++        );
++    }
++    let after = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("after_rejected_claims", &after);
++    assert_eq!(before, after, "rejected claims changed authority state");
++    rp2_observer::emit(
++        "authority_fingerprint_unchanged",
++        json!({"unchanged": before == after}),
++        "approved_validation",
++    );
++    write_result(
++        "chain-binding",
++        json!({"case": "chain-binding", "rejected": case_count, "authority_unchanged": before == after}),
++    );
++}
++
++#[test]
++fn rp2a_dry_run_exact_identity_is_not_a_write() {
++    let _events = start_events("adv-9-dry-run-identity", "AUTHORITY_INVALID", true);
++    let fixture = make_fixture();
++    let before = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("before_no_receipt_validation", &before);
++    let tip = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_header_by_number(fixture.tip_height)
++        .expect("tip")
++        .data();
++    let claim = HandoffClaim {
++        script: fixture.script.clone(),
++        lock_role: true,
++        height: fixture.tip_height,
++        hash: tip.calc_header_hash(),
++        genesis: fixture.chain.consensus().genesis_block().hash(),
++    };
++    let result = validate_claim(
++        fixture.chain.client_storage(),
++        None,
++        &claim,
++        &fixture.script,
++        true,
++    );
++    assert!(result.is_err());
++    rp2_observer::emit(
++        "handoff_validation_rejected",
++        json!({"case": "no_independent_authority", "reason": result.unwrap_err()}),
++        "approved_validation",
++    );
++    let after = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("after_no_receipt_validation", &after);
++    assert_eq!(before, after);
++    rp2_observer::emit(
++        "authority_fingerprint_unchanged",
++        json!({"unchanged": before == after}),
++        "approved_validation",
++    );
++}
+diff --git a/light-client-lib/src/tests/utils/mod.rs b/light-client-lib/src/tests/utils/mod.rs
+index 776a88f..59dcf14 100644
+--- a/light-client-lib/src/tests/utils/mod.rs
++++ b/light-client-lib/src/tests/utils/mod.rs
+@@ -5,7 +5,7 @@ use tempfile::TempDir;
+ mod chain;
+ mod network_context;
+ 
+-pub(crate) use chain::MockChain;
++pub(crate) use chain::{MockChain, MockRunningChain};
+ pub(crate) use network_context::MockNetworkContext;
+ 
+ use crate::storage::Storage;
