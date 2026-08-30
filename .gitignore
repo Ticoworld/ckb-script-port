@@ -1,0 +1,28 @@
+# Disposable upstream checkouts and exported build workspaces
+_work/
+target/
+
+# RP2 run state and generated local databases
+experiments/rp2-real-upstream/run/
+experiments/rp2-real-upstream/target/
+experiments/rp2-real-upstream/**/*.db
+experiments/rp2-real-upstream/**/*.sqlite
+experiments/rp2-real-upstream/**/*.sqlite-shm
+experiments/rp2-real-upstream/**/*.sqlite-wal
+experiments/rp2-real-upstream/**/*.sst
+experiments/rp2-real-upstream/**/*.log
+experiments/rp2-real-upstream/**/events/
+experiments/rp2-real-upstream/**/process-logs/
+experiments/rp2-real-upstream/**/crash/
+
+# Generated fixture binaries; manifests and summaries remain tracked
+experiments/rp2-real-upstream/**/generated/*.bin
+experiments/rp2-real-upstream/**/generated/*.dat
+experiments/rp2-real-upstream/**/generated/*.jsonl
+
+# Local editor and OS files
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
