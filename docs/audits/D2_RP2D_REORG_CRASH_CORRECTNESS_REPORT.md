@@ -219,4 +219,4 @@ This promotion is contingent on committing the reproducible project checkpoint w
 
 ### 9. Final project checkpoint
 
-The accepted RP2 artifacts were committed as project commit `11a3a5893a8363934e9a3a8c2f3db64c33f1a409`. The post-checkpoint R1 rerun updated the manifest to that commit and reported a clean project tree, `RP2-D PASS — PROCEED TO PDEF1 SCOPE FREEZE`, `commit_race_checked=8`, and zero verifier failures. The generated `run-*` databases, logs, event streams, and build workspaces remain ignored; `grant_find` is unchanged.
+The accepted RP2 artifacts were committed as project checkpoint `5673744be3ec3e6318dd7df1aa24de59699d397b`. The post-checkpoint R1 rerun updated the manifest to that checkpoint and reported a clean project tree, `RP2-D PASS — PROCEED TO PDEF1 SCOPE FREEZE`, `commit_race_checked=8`, and zero verifier failures. The generated `run-*` databases, logs, event streams, and build workspaces remain ignored; `grant_find` is unchanged.

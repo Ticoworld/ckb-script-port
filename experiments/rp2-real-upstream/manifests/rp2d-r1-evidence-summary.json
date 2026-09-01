@@ -1,8 +1,8 @@
 {
     "schema_version":  2,
     "experiment":  "D2-RP2D-R1-final-safety-seam-closure",
-    "captured_utc":  "2026-09-01T04:46:59.5478532Z",
-    "project_commit":  "11a3a5893a8363934e9a3a8c2f3db64c33f1a409",
+    "captured_utc":  "2026-09-01T04:48:46.7697023Z",
+    "project_commit":  "5673744be3ec3e6318dd7df1aa24de59699d397b",
     "project_worktree_clean":  true,
     "project_worktree_status":  [
 
@@ -236,8 +236,8 @@
                             "reopen_exit_code":  0,
                             "retry_exit_code":  0,
                             "commit_enter_observed":  true,
-                            "commit_exit_observed":  false,
-                            "kill_timing":  "before_observable_exit_or_indeterminate",
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
                             "authority_before":  {
                                                      "authority_rows":  [
                                                                             {
@@ -271,9 +271,9 @@
                                                                         ]
                                                  },
                             "reopen":  {
-                                           "a1_live":  false,
-                                           "a_progress":  null,
-                                           "a_registered":  false,
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
                                            "a_type_registered":  true,
                                            "authority_fingerprint":  {
                                                                          "authority_rows":  [
@@ -309,14 +309,14 @@
                                                                      },
                                            "b_registered":  true,
                                            "backend":  "rocksdb",
-                                           "consistency":  "OLD_COMPLETE",
+                                           "consistency":  "NEW_COMPLETE",
                                            "expected":  "ANY",
                                            "global_minimum":  36,
-                                           "h_complete":  false,
+                                           "h_complete":  true,
                                            "mode":  "reopen",
-                                           "p_complete":  false,
-                                           "s_complete":  false,
-                                           "script_count":  2
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
                                        },
                             "retry":  {
                                           "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
@@ -716,8 +716,8 @@
                             "reopen_exit_code":  0,
                             "retry_exit_code":  0,
                             "commit_enter_observed":  true,
-                            "commit_exit_observed":  false,
-                            "kill_timing":  "before_observable_exit_or_indeterminate",
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
                             "authority_before":  {
                                                      "authority_rows":  [
                                                                             {
@@ -751,9 +751,9 @@
                                                                         ]
                                                  },
                             "reopen":  {
-                                           "a1_live":  false,
-                                           "a_progress":  null,
-                                           "a_registered":  false,
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
                                            "a_type_registered":  true,
                                            "authority_fingerprint":  {
                                                                          "authority_rows":  [
@@ -789,14 +789,14 @@
                                                                      },
                                            "b_registered":  true,
                                            "backend":  "sqlite",
-                                           "consistency":  "OLD_COMPLETE",
+                                           "consistency":  "NEW_COMPLETE",
                                            "expected":  "ANY",
                                            "global_minimum":  36,
-                                           "h_complete":  false,
+                                           "h_complete":  true,
                                            "mode":  "reopen",
-                                           "p_complete":  false,
-                                           "s_complete":  false,
-                                           "script_count":  2
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
                                        },
                             "retry":  {
                                           "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
@@ -1270,9 +1270,9 @@
                                                      {
                                                          "backend":  "rocksdb",
                                                          "trial":  2,
-                                                         "classification":  "OLD_COMPLETE",
+                                                         "classification":  "NEW_COMPLETE",
                                                          "commit_enter_observed":  true,
-                                                         "commit_exit_observed":  false,
+                                                         "commit_exit_observed":  true,
                                                          "coherent":  true
                                                      },
                                                      {
@@ -1310,9 +1310,9 @@
                                                      {
                                                          "backend":  "sqlite",
                                                          "trial":  3,
-                                                         "classification":  "OLD_COMPLETE",
+                                                         "classification":  "NEW_COMPLETE",
                                                          "commit_enter_observed":  true,
-                                                         "commit_exit_observed":  false,
+                                                         "commit_exit_observed":  true,
                                                          "coherent":  true
                                                      },
                                                      {
