@@ -1,0 +1,1336 @@
+{
+    "schema_version":  2,
+    "experiment":  "D2-RP2D-R1-final-safety-seam-closure",
+    "captured_utc":  "2026-09-01T04:46:59.5478532Z",
+    "project_commit":  "11a3a5893a8363934e9a3a8c2f3db64c33f1a409",
+    "project_worktree_clean":  true,
+    "project_worktree_status":  [
+
+                                ],
+    "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+    "toolchain":  "stable / Rust 1.96.0",
+    "cargo_lock_sha256":  "F3A18D999A89519024B44B702C1637C571217CEB8D06CD7E39126E8D22EAE890",
+    "patch_sha256":  {
+                         "0001-rp2a-observer-and-negative-controls.patch":  "91D4E480A88267441A751F3E83032BEB6BA30DA25D63A07B0B222F786A6FB4AD",
+                         "0002-rp2b-typed-script-handoff.patch":  "D811E5F6E1941A262884DFE2D2C2013216D8BCFB22AB3AD05B30D5AAD08C4F5F",
+                         "0003-rp2b-spendable-fixture.patch":  "23C933F7FBC7969A136D467279D1EFBED222566DD51C879613ABC70974591607",
+                         "0004-rp2c-cross-backend-transport.patch":  "8C0B8F9D60CE54647B9C99E372E2B51E833CEF1B57AF4C2B0F789316941EDDC7",
+                         "0005-rp2d-reorg-crash-test.patch":  "5EF44FE5EC25965742707E04E98229BB4C9A785D5EBE19E394486E3652E4E5A3",
+                         "0006-rp2d-exclusive-import-safety-seam.patch":  "27548A9520A438B971F20C83C76C7B9918FCC233365A8055BC805AA747E0B6F9",
+                         "0007-rp2d-commit-edge-observability.patch":  "A7D30A1E00EED8AFEC427BFA8D0696345980457D0CC89FDCFAA904285A8A174F"
+                     },
+    "lifecycle_guard_type":  "test-only shared ImportLifecycle with RAII protocol activity and offline import guards",
+    "offline_exclusive_enforced":  true,
+    "artifact_model":  "owned immutable decoded TypedScriptHandoff object",
+    "artifact_remove_after_validation_tested":  true,
+    "artifact_replacement_after_validation_tested":  true,
+    "simultaneous_imports_tested":  false,
+    "safety_evidence":  [
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged_on_rejection":  true,
+                                "backend":  "rocksdb",
+                                "idempotent_after_retry":  false,
+                                "mode":  "live-import-rejected",
+                                "offline_retry_succeeded":  true,
+                                "rejected_before_mutation":  true,
+                                "rejection_reason":  "handoff import requires an exclusive offline destination",
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "rocksdb",
+                                "import_succeeded":  true,
+                                "imported_index_rows":  1,
+                                "imported_transaction_rows":  3,
+                                "mode":  "artifact-remove",
+                                "original_artifact_removed_or_replaced":  true,
+                                "owned_object_model":  true,
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "rocksdb",
+                                "import_succeeded":  true,
+                                "imported_index_rows":  1,
+                                "imported_transaction_rows":  3,
+                                "mode":  "artifact-replace",
+                                "original_artifact_removed_or_replaced":  true,
+                                "owned_object_model":  true,
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "rocksdb",
+                                "conflicting_artifact":  {
+                                                             "reason":  "handoff would regress Script progress",
+                                                             "rejected_after_winner":  true
+                                                         },
+                                "mode":  "simultaneous-import",
+                                "persisted_state_coherent":  true,
+                                "same_artifact":  {
+                                                      "first_committed":  true,
+                                                      "retry_idempotent":  true,
+                                                      "second_rejected_busy":  true
+                                                  },
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged_on_rejection":  true,
+                                "backend":  "sqlite",
+                                "idempotent_after_retry":  false,
+                                "mode":  "live-import-rejected",
+                                "offline_retry_succeeded":  true,
+                                "rejected_before_mutation":  true,
+                                "rejection_reason":  "handoff import requires an exclusive offline destination",
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "sqlite",
+                                "import_succeeded":  true,
+                                "imported_index_rows":  1,
+                                "imported_transaction_rows":  3,
+                                "mode":  "artifact-remove",
+                                "original_artifact_removed_or_replaced":  true,
+                                "owned_object_model":  true,
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "sqlite",
+                                "import_succeeded":  true,
+                                "imported_index_rows":  1,
+                                "imported_transaction_rows":  3,
+                                "mode":  "artifact-replace",
+                                "original_artifact_removed_or_replaced":  true,
+                                "owned_object_model":  true,
+                                "unrelated_script_preserved":  true
+                            },
+                            {
+                                "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                "authority_unchanged":  true,
+                                "backend":  "sqlite",
+                                "conflicting_artifact":  {
+                                                             "reason":  "handoff would regress Script progress",
+                                                             "rejected_after_winner":  true
+                                                         },
+                                "mode":  "simultaneous-import",
+                                "persisted_state_coherent":  true,
+                                "same_artifact":  {
+                                                      "first_committed":  true,
+                                                      "retry_idempotent":  true,
+                                                      "second_rejected_busy":  true
+                                                  },
+                                "unrelated_script_preserved":  true
+                            }
+                        ],
+    "commit_race":  [
+                        {
+                            "backend":  "rocksdb",
+                            "source_artifact_backend":  "sqlite",
+                            "trial":  1,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "rocksdb",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "rocksdb",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "rocksdb",
+                            "source_artifact_backend":  "sqlite",
+                            "trial":  2,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  false,
+                            "kill_timing":  "before_observable_exit_or_indeterminate",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  false,
+                                           "a_progress":  null,
+                                           "a_registered":  false,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "rocksdb",
+                                           "consistency":  "OLD_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  false,
+                                           "mode":  "reopen",
+                                           "p_complete":  false,
+                                           "s_complete":  false,
+                                           "script_count":  2
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "rocksdb",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "rocksdb",
+                            "source_artifact_backend":  "sqlite",
+                            "trial":  3,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "rocksdb",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "rocksdb",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "rocksdb",
+                            "source_artifact_backend":  "sqlite",
+                            "trial":  4,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "rocksdb",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "rocksdb",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "sqlite",
+                            "source_artifact_backend":  "rocksdb",
+                            "trial":  1,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "sqlite",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "sqlite",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "sqlite",
+                            "source_artifact_backend":  "rocksdb",
+                            "trial":  2,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "sqlite",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "sqlite",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "sqlite",
+                            "source_artifact_backend":  "rocksdb",
+                            "trial":  3,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  false,
+                            "kill_timing":  "before_observable_exit_or_indeterminate",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  false,
+                                           "a_progress":  null,
+                                           "a_registered":  false,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "sqlite",
+                                           "consistency":  "OLD_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  false,
+                                           "mode":  "reopen",
+                                           "p_complete":  false,
+                                           "s_complete":  false,
+                                           "script_count":  2
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "sqlite",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        },
+                        {
+                            "backend":  "sqlite",
+                            "source_artifact_backend":  "rocksdb",
+                            "trial":  4,
+                            "crash_exit_code":  -1,
+                            "reopen_exit_code":  0,
+                            "retry_exit_code":  0,
+                            "commit_enter_observed":  true,
+                            "commit_exit_observed":  true,
+                            "kill_timing":  "after_observable_exit",
+                            "authority_before":  {
+                                                     "authority_rows":  [
+                                                                            {
+                                                                                "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xc00000000000000000",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xd000000000",
+                                                                                "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe047454e455349535f424c4f434b",
+                                                                                "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04c4153545f5354415445",
+                                                                                "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                            },
+                                                                            {
+                                                                                "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                "value":  "0x00000000"
+                                                                            }
+                                                                        ]
+                                                 },
+                            "reopen":  {
+                                           "a1_live":  true,
+                                           "a_progress":  36,
+                                           "a_registered":  true,
+                                           "a_type_registered":  true,
+                                           "authority_fingerprint":  {
+                                                                         "authority_rows":  [
+                                                                                                {
+                                                                                                    "key":  "0xa0c117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                                                                                                    "value":  "0x000000005c8f02200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fac6e19df5ded883fa102218a84186daf061c5bdd89d5c728cde9c5c74a9bb82000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5d3a635135a12e0000c16ff2862300ba73e3e09405000000b3ea3b1bfbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xc00000000000000000",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xd000000000",
+                                                                                                    "value":  "0x96dd5bb0ad6cbd7841c00c158b56aca748842c56eb835dee4ba4371af9220e63"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe047454e455349535f424c4f434b",
+                                                                                                    "value":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5bc0e5a7e4afa1b305e3fd46bc7c630a3e80449477986fb593ab685df6f51980bbcf3cdeb7190d118cf8fa9aa8db6c45c3ed158bb16ea091d6c40be1b65b896065"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f4e5f48454144455253",
+                                                                                                    "value":  "0x2100000000000000c18805dfa3d3716c1e5809539e4b585fc232370e936d2b57177910194d23f98a2200000000000000f12d6ac9f7a5e47f8b2b16de8e53a5407993a3613fe16a005e5d64b1b1374b9c2300000000000000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c841"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04c4153545f5354415445",
+                                                                                                    "value":  "0x740e000000000000000000000000000000000000000000000000000000000000000000005c8f02200c04000000000000240000000000000003000006000a0000286c252ba6d5840ba066661c33718070e5c10ecb6fa6ee9bddad484de8d1c84146c616c84283721a7a63ce3217cf98d6179cf765498aac5fc6d75898b433c63600000000000000000000000000000000000000000000000000000000000000007bdf159d0f29e28170cdf333ce1742f2177d9c5ebcc02eb9922ca74dc53e9f9baffe2ad72d72a42e9176a3838b8723002b79b9da5fb000000094641933fbfe0600000000000000000000000000000000"
+                                                                                                },
+                                                                                                {
+                                                                                                    "key":  "0xe04d41585f434845434b5f504f494e545f494e444558",
+                                                                                                    "value":  "0x00000000"
+                                                                                                }
+                                                                                            ]
+                                                                     },
+                                           "b_registered":  true,
+                                           "backend":  "sqlite",
+                                           "consistency":  "NEW_COMPLETE",
+                                           "expected":  "ANY",
+                                           "global_minimum":  36,
+                                           "h_complete":  true,
+                                           "mode":  "reopen",
+                                           "p_complete":  true,
+                                           "s_complete":  true,
+                                           "script_count":  3
+                                       },
+                            "retry":  {
+                                          "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                                          "backend":  "sqlite",
+                                          "mode":  "crash-import-unexpectedly-completed"
+                                      }
+                        }
+                    ],
+    "commit_race_pass":  true,
+    "consistency_verifier":  {
+                                 "schema_version":  1,
+                                 "experiment":  "D2-RP2D-persisted-state-consistency",
+                                 "rows":  [
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C0",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C1",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C2",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C3",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C4",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C5",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C6",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C7",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C8",
+                                                  "expected":  "NEW_COMPLETE",
+                                                  "classification":  "NEW_COMPLETE",
+                                                  "s_complete":  true,
+                                                  "h_complete":  true,
+                                                  "p_complete":  true,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "rocksdb",
+                                                  "source_artifact_backend":  "sqlite",
+                                                  "stage":  "C9",
+                                                  "expected":  "NEW_COMPLETE",
+                                                  "classification":  "NEW_COMPLETE",
+                                                  "s_complete":  true,
+                                                  "h_complete":  true,
+                                                  "p_complete":  true,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C0",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C1",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C2",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C3",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C4",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C5",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C6",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C7",
+                                                  "expected":  "OLD_COMPLETE",
+                                                  "classification":  "OLD_COMPLETE",
+                                                  "s_complete":  false,
+                                                  "h_complete":  false,
+                                                  "p_complete":  false,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C8",
+                                                  "expected":  "NEW_COMPLETE",
+                                                  "classification":  "NEW_COMPLETE",
+                                                  "s_complete":  true,
+                                                  "h_complete":  true,
+                                                  "p_complete":  true,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              },
+                                              {
+                                                  "backend":  "sqlite",
+                                                  "source_artifact_backend":  "rocksdb",
+                                                  "stage":  "C9",
+                                                  "expected":  "NEW_COMPLETE",
+                                                  "classification":  "NEW_COMPLETE",
+                                                  "s_complete":  true,
+                                                  "h_complete":  true,
+                                                  "p_complete":  true,
+                                                  "global_minimum":  36,
+                                                  "authority_observed":  true,
+                                                  "authority_unchanged":  true,
+                                                  "unrelated_script_present":  true,
+                                                  "retry_exit_code":  0
+                                              }
+                                          ],
+                                 "checked":  20,
+                                 "passed":  true,
+                                 "failures":  [
+
+                                              ],
+                                 "safety_evidence":  [
+                                                         {
+                                                             "mode":  "live-import-rejected",
+                                                             "backend":  "rocksdb",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "artifact-remove",
+                                                             "backend":  "rocksdb",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "artifact-replace",
+                                                             "backend":  "rocksdb",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "simultaneous-import",
+                                                             "backend":  "rocksdb",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "live-import-rejected",
+                                                             "backend":  "sqlite",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "artifact-remove",
+                                                             "backend":  "sqlite",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "artifact-replace",
+                                                             "backend":  "sqlite",
+                                                             "coherent":  true
+                                                         },
+                                                         {
+                                                             "mode":  "simultaneous-import",
+                                                             "backend":  "sqlite",
+                                                             "coherent":  true
+                                                         }
+                                                     ],
+                                 "safety_checked":  8,
+                                 "safety_failures":  [
+
+                                                     ],
+                                 "commit_race":  [
+                                                     {
+                                                         "backend":  "rocksdb",
+                                                         "trial":  1,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "rocksdb",
+                                                         "trial":  2,
+                                                         "classification":  "OLD_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  false,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "rocksdb",
+                                                         "trial":  3,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "rocksdb",
+                                                         "trial":  4,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "sqlite",
+                                                         "trial":  1,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "sqlite",
+                                                         "trial":  2,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "sqlite",
+                                                         "trial":  3,
+                                                         "classification":  "OLD_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  false,
+                                                         "coherent":  true
+                                                     },
+                                                     {
+                                                         "backend":  "sqlite",
+                                                         "trial":  4,
+                                                         "classification":  "NEW_COMPLETE",
+                                                         "commit_enter_observed":  true,
+                                                         "commit_exit_observed":  true,
+                                                         "coherent":  true
+                                                     }
+                                                 ],
+                                 "commit_race_checked":  8,
+                                 "commit_race_failures":  [
+
+                                                          ]
+                             },
+    "reorg_regression":  "reproduced by unchanged run-rp2d.ps1",
+    "authority_unchanged_during_import":  true,
+    "handoff_seam_changed":  false,
+    "verdict":  "RP2-D PASS — PROCEED TO PDEF1 SCOPE FREEZE"
+}

@@ -1,0 +1,1245 @@
+﻿diff --git a/light-client-lib/src/protocols/filter/block_filter.rs b/light-client-lib/src/protocols/filter/block_filter.rs
+index ce68385..8fa8629 100644
+--- a/light-client-lib/src/protocols/filter/block_filter.rs
++++ b/light-client-lib/src/protocols/filter/block_filter.rs
+@@ -29,11 +29,17 @@ pub struct FilterProtocol {
+     pub(crate) storage: Storage,
+     pub(crate) peers: Arc<Peers>,
+     pub(crate) last_ask_time: Arc<RwLock<Option<Instant>>>,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    _lifecycle_guard: crate::storage::ProtocolActivityGuard,
+ }
+ 
+ impl FilterProtocol {
+     pub fn new(storage: Storage, peers: Arc<Peers>) -> Self {
+         Self {
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            _lifecycle_guard: storage
++                .acquire_protocol_activity()
++                .expect("filter protocol activity guard should be available"),
+             storage,
+             peers,
+             last_ask_time: Arc::new(Default::default()),
+diff --git a/light-client-lib/src/protocols/light_client/mod.rs b/light-client-lib/src/protocols/light_client/mod.rs
+index b3fdc37..7e10364 100644
+--- a/light-client-lib/src/protocols/light_client/mod.rs
++++ b/light-client-lib/src/protocols/light_client/mod.rs
+@@ -56,6 +56,8 @@ pub struct LightClientProtocol {
+     mmr_activated_epoch: EpochNumber,
+     last_n_blocks: BlockNumber,
+     init_blocks_in_transit_per_peer: usize,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    _lifecycle_guard: crate::storage::ProtocolActivityGuard,
+ }
+ 
+ #[async_trait]
+@@ -423,6 +425,10 @@ impl LightClientProtocol {
+             _ => 0,
+         };
+         Self {
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            _lifecycle_guard: storage
++                .acquire_protocol_activity()
++                .expect("light-client protocol activity guard should be available"),
+             storage,
+             peers,
+             consensus,
+diff --git a/light-client-lib/src/protocols/relayer.rs b/light-client-lib/src/protocols/relayer.rs
+index 50a453f..294a8b2 100644
+--- a/light-client-lib/src/protocols/relayer.rs
++++ b/light-client-lib/src/protocols/relayer.rs
+@@ -24,6 +24,8 @@ pub struct RelayProtocol {
+     pending_txs: Arc<RwLock<PendingTxs>>,
+ 
+     storage: Storage,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    _lifecycle_guard: crate::storage::ProtocolActivityGuard,
+ }
+ 
+ // a simple struct to store the pending transactions in memory with size limit
+@@ -92,6 +94,10 @@ impl RelayProtocol {
+             opened_peers: HashMap::new(),
+             pending_txs,
+             connected_peers,
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            _lifecycle_guard: storage
++                .acquire_protocol_activity()
++                .expect("relay protocol activity guard should be available"),
+             storage,
+         }
+     }
+diff --git a/light-client-lib/src/protocols/synchronizer.rs b/light-client-lib/src/protocols/synchronizer.rs
+index 98eb52a..499891b 100644
+--- a/light-client-lib/src/protocols/synchronizer.rs
++++ b/light-client-lib/src/protocols/synchronizer.rs
+@@ -16,6 +16,8 @@ use crate::utils::network::prove_or_download_matched_blocks;
+ pub struct SyncProtocol {
+     storage: Storage,
+     peers: Arc<Peers>,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    _lifecycle_guard: crate::storage::ProtocolActivityGuard,
+ }
+ 
+ fn block_body_matches_header(block: &BlockView) -> bool {
+@@ -30,7 +32,14 @@ fn block_body_matches_header(block: &BlockView) -> bool {
+ 
+ impl SyncProtocol {
+     pub fn new(storage: Storage, peers: Arc<Peers>) -> Self {
+-        Self { storage, peers }
++        Self {
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            _lifecycle_guard: storage
++                .acquire_protocol_activity()
++                .expect("sync protocol activity guard should be available"),
++            storage,
++            peers,
++        }
+     }
+ }
+ 
+diff --git a/light-client-lib/src/rp2_handoff.rs b/light-client-lib/src/rp2_handoff.rs
+index 37efe9a..ef14378 100644
+--- a/light-client-lib/src/rp2_handoff.rs
++++ b/light-client-lib/src/rp2_handoff.rs
+@@ -13,8 +13,19 @@ use crate::storage::{
+     LightClientStorage, ScriptStatus, ScriptType, StorageBackend,
+ };
+ 
++#[cfg(all(test, not(target_arch = "wasm32")))]
++use crate::storage::OfflineImportGuard;
++
+ pub const HANDOFF_FORMAT_VERSION: u32 = 1;
+ 
++#[cfg(test)]
++fn rp2d_maybe_abort(stage: &str) {
++    if std::env::var("RP2D_CRASH_STAGE").ok().as_deref() == Some(stage) {
++        eprintln!("RP2-D deliberate child-process abort at {stage}");
++        std::process::abort();
++    }
++}
++
+ #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+ pub enum HandoffRole {
+     Lock,
+@@ -101,6 +112,11 @@ pub enum HandoffError {
+     Storage(String),
+ }
+ 
++#[cfg(all(test, not(target_arch = "wasm32")))]
++pub trait HandoffLifecycle {
++    fn acquire_handoff_import(&self) -> Result<OfflineImportGuard, String>;
++}
++
+ impl std::fmt::Display for HandoffError {
+     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         match self {
+@@ -189,7 +205,10 @@ fn all_rows_unique(rows: impl Iterator<Item = HandoffRow>) -> Result<Vec<Handoff
+     Ok(output)
+ }
+ 
+-pub trait TypedScriptHandoffStorage: LightClientStorage {
++pub trait TypedScriptHandoffStorage: LightClientStorage
++where
++    Self: HandoffLifecycle,
++{
+     /// Export exact Script-role index rows and the minimum transaction closure.
+     fn export_typed_script_handoff(
+         &self,
+@@ -262,6 +281,19 @@ pub trait TypedScriptHandoffStorage: LightClientStorage {
+     where
+         Self: Sized,
+     {
++        // Import is an explicitly exclusive offline transition.  Acquire the
++        // guard before validation so a live or competing caller fails before
++        // it can mutate any S/H/P row or scheduler metadata.
++        let _import_guard = self
++            .acquire_handoff_import()
++            .map_err(HandoffError::Invalid)?;
++        if let Ok(raw_ms) = std::env::var("RP2D_IMPORT_HOLD_MS") {
++            if let Ok(ms) = raw_ms.parse::<u64>() {
++                std::thread::sleep(std::time::Duration::from_millis(ms));
++            }
++        }
++        #[cfg(test)]
++        rp2d_maybe_abort("C0");
+         if handoff.format_version != HANDOFF_FORMAT_VERSION {
+             return Err(HandoffError::Invalid("unsupported handoff format version".to_owned()));
+         }
+@@ -308,6 +340,8 @@ pub trait TypedScriptHandoffStorage: LightClientStorage {
+         if state_rows.iter().chain(closure_rows.iter()).any(|row| row.key.first().is_some_and(|p| *p >= KeyPrefix::BlockHash as u8)) {
+             return Err(HandoffError::Invalid("handoff attempts to import chain authority state".to_owned()));
+         }
++        #[cfg(test)]
++        rp2d_maybe_abort("C1");
+ 
+         let reg_key = registration_key(&handoff.script, handoff.role);
+         let existing_status = self
+@@ -343,20 +377,36 @@ pub trait TypedScriptHandoffStorage: LightClientStorage {
+             });
+         }
+         let recomputed_min = scripts.iter().map(|ss| ss.block_number).min().unwrap_or_default();
++        #[cfg(test)]
++        rp2d_maybe_abort("C2");
+ 
+         // Every approved S/H/P write, including the shared global minimum, is
+         // one real backend batch.  No C rows (prefixes 160+) are included.
+         let mut batch = self.batch();
++        #[cfg(test)]
++        rp2d_maybe_abort("C3");
+         for row in state_rows.iter().chain(closure_rows.iter()) {
+             batch.put(&row.key, &row.value);
+         }
++        #[cfg(test)]
++        rp2d_maybe_abort("C4");
+         batch.put(&reg_key, &handoff.progress.cursor.to_be_bytes());
++        #[cfg(test)]
++        rp2d_maybe_abort("C5");
+         batch.put(
+             &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
+             &recomputed_min.to_le_bytes(),
+         );
++        #[cfg(test)]
++        rp2d_maybe_abort("C6");
++        #[cfg(test)]
++        rp2d_maybe_abort("C7");
+         batch.commit().map_err(|e| HandoffError::Storage(e.to_string()))?;
++        #[cfg(test)]
++        rp2d_maybe_abort("C8");
+ 
++        #[cfg(test)]
++        rp2d_maybe_abort("C9");
+         Ok(ImportOutcome {
+             idempotent: existing_status.is_some(),
+             imported_index_rows: handoff.state.index_rows.len(),
+@@ -366,4 +416,4 @@ pub trait TypedScriptHandoffStorage: LightClientStorage {
+     }
+ }
+ 
+-impl<S: LightClientStorage> TypedScriptHandoffStorage for S {}
++impl<S: LightClientStorage + HandoffLifecycle> TypedScriptHandoffStorage for S {}
+diff --git a/light-client-lib/src/storage/db/native.rs b/light-client-lib/src/storage/db/native.rs
+index f53e15a..20f57fc 100644
+--- a/light-client-lib/src/storage/db/native.rs
++++ b/light-client-lib/src/storage/db/native.rs
+@@ -30,6 +30,8 @@ impl From<IteratorDirection> for Direction {
+ #[derive(Clone)]
+ pub struct Storage {
+     pub(crate) db: Arc<DB>,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) import_lifecycle: Arc<crate::storage::ImportLifecycle>,
+ }
+ 
+ impl Storage {
+@@ -39,8 +41,22 @@ impl Storage {
+         opts.set_max_total_wal_size(128 * 1024 * 1024);
+         opts.set_write_buffer_size(128 * 1024 * 1024);
+         opts.set_max_write_buffer_number(2);
+-        let db = Arc::new(DB::open(&opts, path).expect("Failed to open rocksdb"));
+-        Self { db }
++        let db = Arc::new(DB::open(&opts, &path).expect("Failed to open rocksdb"));
++        Self {
++            db,
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            import_lifecycle: crate::storage::import_lifecycle_for_path(path),
++        }
++    }
++
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) fn acquire_protocol_activity(&self) -> std::result::Result<crate::storage::ProtocolActivityGuard, String> {
++        self.import_lifecycle.acquire_protocol()
++    }
++
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) fn acquire_handoff_import(&self) -> std::result::Result<crate::storage::OfflineImportGuard, String> {
++        self.import_lifecycle.acquire_import()
+     }
+ 
+     fn batch(&self) -> Batch {
+@@ -78,7 +94,11 @@ impl BatchWriter for Batch {
+     }
+ 
+     fn commit(self) -> Result<()> {
++        #[cfg(all(test, not(target_arch = "wasm32")))]
++        crate::storage::rp2d_commit_signal("commit_enter");
+         self.db.write(&self.wb)?;
++        #[cfg(all(test, not(target_arch = "wasm32")))]
++        crate::storage::rp2d_commit_signal("commit_exit");
+         Ok(())
+     }
+ }
+@@ -139,6 +159,13 @@ impl StorageBackend for Storage {
+ // All methods use default implementations from the trait
+ impl LightClientStorage for Storage {}
+ 
++#[cfg(all(test, not(target_arch = "wasm32")))]
++impl crate::rp2_handoff::HandoffLifecycle for Storage {
++    fn acquire_handoff_import(&self) -> std::result::Result<crate::storage::OfflineImportGuard, String> {
++        Storage::acquire_handoff_import(self)
++    }
++}
++
+ impl CellProvider for Storage {
+     // assume all cells are live and load data eagerly
+     fn cell(&self, out_point: &OutPoint, _eager_load: bool) -> CellStatus {
+diff --git a/light-client-lib/src/storage/db/sqlite.rs b/light-client-lib/src/storage/db/sqlite.rs
+index 250eca2..7a07aae 100644
+--- a/light-client-lib/src/storage/db/sqlite.rs
++++ b/light-client-lib/src/storage/db/sqlite.rs
+@@ -23,6 +23,8 @@ use std::{
+ #[derive(Clone)]
+ pub struct Storage {
+     pub(crate) conn: Arc<Mutex<Connection>>,
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) import_lifecycle: Arc<crate::storage::ImportLifecycle>,
+ }
+ 
+ impl Storage {
+@@ -48,9 +50,21 @@ impl Storage {
+ 
+         Self {
+             conn: Arc::new(Mutex::new(conn)),
++            #[cfg(all(test, not(target_arch = "wasm32")))]
++            import_lifecycle: crate::storage::import_lifecycle_for_path(&db_path),
+         }
+     }
+ 
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) fn acquire_protocol_activity(&self) -> std::result::Result<crate::storage::ProtocolActivityGuard, String> {
++        self.import_lifecycle.acquire_protocol()
++    }
++
++    #[cfg(all(test, not(target_arch = "wasm32")))]
++    pub(crate) fn acquire_handoff_import(&self) -> std::result::Result<crate::storage::OfflineImportGuard, String> {
++        self.import_lifecycle.acquire_import()
++    }
++
+     fn init_schema(conn: &Connection) -> Result<()> {
+         conn.execute_batch(
+             r#"
+@@ -150,9 +164,14 @@ impl BatchWriter for Batch {
+             }
+         }
+ 
++        #[cfg(all(test, not(target_arch = "wasm32")))]
++        crate::storage::rp2d_commit_signal("commit_enter");
+         tx.commit()
+             .map_err(|e| crate::error::Error::runtime(format!("Failed to commit batch: {}", e)))?;
+ 
++        #[cfg(all(test, not(target_arch = "wasm32")))]
++        crate::storage::rp2d_commit_signal("commit_exit");
++
+         Ok(())
+     }
+ }
+@@ -248,6 +267,13 @@ impl StorageBackend for Storage {
+ // All methods use default implementations from the trait
+ impl LightClientStorage for Storage {}
+ 
++#[cfg(all(test, not(target_arch = "wasm32")))]
++impl crate::rp2_handoff::HandoffLifecycle for Storage {
++    fn acquire_handoff_import(&self) -> std::result::Result<crate::storage::OfflineImportGuard, String> {
++        Storage::acquire_handoff_import(self)
++    }
++}
++
+ impl CellProvider for Storage {
+     // assume all cells are live and load data eagerly
+     fn cell(&self, out_point: &OutPoint, _eager_load: bool) -> CellStatus {
+diff --git a/light-client-lib/src/storage/mod.rs b/light-client-lib/src/storage/mod.rs
+index 5ef7fb0..ddeddf6 100644
+--- a/light-client-lib/src/storage/mod.rs
++++ b/light-client-lib/src/storage/mod.rs
+@@ -1,5 +1,8 @@
+ use std::{collections::HashMap, sync::Arc};
+ 
++#[cfg(all(test, not(target_arch = "wasm32")))]
++use std::{collections::HashMap as StdHashMap, path::Path, sync::{Mutex as StdMutex, OnceLock}};
++
+ use ckb_traits::{
+     CellDataProvider, ExtensionProvider, HeaderFields, HeaderFieldsProvider, HeaderProvider,
+ };
+@@ -47,6 +50,100 @@ const MIN_FILTERED_BLOCK_NUMBER: &str = "MIN_FILTERED_NUMBER";
+ const LAST_N_HEADERS_KEY: &str = "LAST_N_HEADERS";
+ const MAX_CHECK_POINT_INDEX: &str = "MAX_CHECK_POINT_INDEX";
+ 
++// The RP2 handoff is a test-only storage seam.  Keep its lifecycle state
++// outside the backend schema and share it across every Storage clone (and
++// every same-process reopen of the same path) so protocol activity and import
++// ownership cannot be silently interleaved.
++#[cfg(all(test, not(target_arch = "wasm32")))]
++#[derive(Default)]
++pub(crate) struct ImportLifecycle {
++    state: StdMutex<ImportLifecycleState>,
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++#[derive(Default)]
++struct ImportLifecycleState {
++    active_workers: usize,
++    importing: bool,
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++pub(crate) struct ProtocolActivityGuard {
++    lifecycle: Arc<ImportLifecycle>,
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++pub(crate) struct OfflineImportGuard {
++    lifecycle: Arc<ImportLifecycle>,
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++impl ImportLifecycle {
++    fn acquire_protocol(self: &Arc<Self>) -> Result<ProtocolActivityGuard, String> {
++        let mut state = self.state.lock().map_err(|_| "lifecycle mutex poisoned".to_owned())?;
++        if state.importing {
++            return Err("normal protocol activity cannot start during handoff import".to_owned());
++        }
++        state.active_workers += 1;
++        Ok(ProtocolActivityGuard { lifecycle: Arc::clone(self) })
++    }
++
++    fn acquire_import(self: &Arc<Self>) -> Result<OfflineImportGuard, String> {
++        let mut state = self.state.lock().map_err(|_| "lifecycle mutex poisoned".to_owned())?;
++        if state.importing {
++            return Err("another handoff import already owns the destination".to_owned());
++        }
++        if state.active_workers != 0 {
++            return Err("handoff import requires an exclusive offline destination".to_owned());
++        }
++        state.importing = true;
++        Ok(OfflineImportGuard { lifecycle: Arc::clone(self) })
++    }
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++impl Drop for ProtocolActivityGuard {
++    fn drop(&mut self) {
++        if let Ok(mut state) = self.lifecycle.state.lock() {
++            state.active_workers = state.active_workers.saturating_sub(1);
++        }
++    }
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++impl Drop for OfflineImportGuard {
++    fn drop(&mut self) {
++        if let Ok(mut state) = self.lifecycle.state.lock() {
++            state.importing = false;
++        }
++    }
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++static IMPORT_LIFECYCLES: OnceLock<StdMutex<StdHashMap<String, Arc<ImportLifecycle>>>> = OnceLock::new();
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++pub(crate) fn import_lifecycle_for_path<P: AsRef<Path>>(path: P) -> Arc<ImportLifecycle> {
++    let key = path.as_ref().to_string_lossy().to_string();
++    let map = IMPORT_LIFECYCLES.get_or_init(|| StdMutex::new(StdHashMap::new()));
++    let mut map = map.lock().expect("import lifecycle map should not be poisoned");
++    Arc::clone(map.entry(key).or_insert_with(|| Arc::new(ImportLifecycle::default())))
++}
++
++#[cfg(all(test, not(target_arch = "wasm32")))]
++pub(crate) fn rp2d_commit_signal(stage: &str) {
++    let Ok(path) = std::env::var("RP2D_COMMIT_SIGNAL") else { return };
++    use std::io::Write;
++    let mut file = std::fs::OpenOptions::new()
++        .create(true)
++        .append(true)
++        .open(path)
++        .expect("RP2-D commit signal should open");
++    writeln!(file, "{stage}").expect("RP2-D commit signal should write");
++    file.flush().expect("RP2-D commit signal should flush");
++    file.sync_all().expect("RP2-D commit signal should sync");
++}
++
+ pub struct HeaderWithExtension {
+     pub header: Header,
+     pub extension: Option<packed::Bytes>,
+diff --git a/light-client-lib/src/tests/rp2_authority_replay.rs b/light-client-lib/src/tests/rp2_authority_replay.rs
+index 9b5ea6f..39fc41c 100644
+--- a/light-client-lib/src/tests/rp2_authority_replay.rs
++++ b/light-client-lib/src/tests/rp2_authority_replay.rs
+@@ -14,6 +14,7 @@ use ckb_types::{
+     core::{BlockNumber, BlockView, ScriptHashType, TransactionView},
+     packed::{self, Script},
+     prelude::*,
++    utilities::merkle_mountain_range::VerifiableHeader,
+ };
+ use serde::{Deserialize, Serialize};
+ use serde_json::{json, Value};
+@@ -224,6 +225,16 @@ fn write_fixture_manifest(
+ fn make_fixture() -> Fixture {
+     let script = script_a();
+     let chain = MockChain::new_with_spendable_pow("rp2a-fixture").start();
++    make_fixture_with_chain(script, chain)
++}
++
++fn make_fixture_at_path(path: &std::path::Path) -> Fixture {
++    let script = script_a();
++    let chain = MockChain::new_with_spendable_pow_at_path(path).start();
++    make_fixture_with_chain(script, chain)
++}
++
++fn make_fixture_with_chain(script: Script, chain: MockRunningChain) -> Fixture {
+     for _ in 1..=28 {
+         chain.mine_block(deterministic_timestamped_block);
+     }
+@@ -784,6 +795,9 @@ async fn rp2b_typed_handoff_core() {
+         height: receipt.height,
+         hash: receipt.hash.clone(),
+     };
++    // The supported handoff lifecycle is offline: release the authority
++    // protocol before entering the storage-only transition.
++    drop(light_client);
+     let outcome = destination_fixture
+         .chain
+         .client_storage()
+@@ -1002,6 +1016,7 @@ async fn rp2b_real_import_adversaries_reject_closed() {
+     let mut protocol = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
+     let nc = MockNetworkContext::new(SupportProtocols::LightClient);
+     let receipt = establish_authority(&fixture.chain, &mut protocol, &nc, peer_index, fixture.tip_height).await;
++    drop(protocol);
+     let before = authority_fingerprint(fixture.chain.client_storage());
+     record_fingerprint("before_real_import_adversaries", &before);
+     let authority = DestinationAuthority {
+@@ -2314,6 +2329,7 @@ async fn rp2c_import_worker() {
+     let (envelope, handoff, artifact_digest) = read_artifact(&PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"))).expect("read RP2-C artifact");
+     rp2_observer::emit("typed_handoff_artifact_decoded", json!({"artifact_version": envelope.format_version, "source_backend": envelope.source_backend, "artifact_digest": artifact_digest}), "experimental_transport");
+     let authority = DestinationAuthority { genesis_hash: receipt.genesis.clone(), height: receipt.height, hash: receipt.hash.clone() };
++    drop(protocol);
+     let outcome = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("cross-backend typed import");
+     let after_chain = chain_authority_fingerprint(fixture.chain.client_storage());
+     let after_full = authority_fingerprint(fixture.chain.client_storage());
+@@ -2399,6 +2415,668 @@ async fn rp2c_negative_worker() {
+     rp2c_output(json!({"mode": "negative", "case": case, "process_id": rp2c_required_env("RP2C_PROCESS_ID"), "backend": BACKEND, "rejected": true, "reason": reason, "authority_unchanged": before == after, "destination_scripts_empty": true}));
+ }
+ 
++// RP2-D reorg worker.  The destination first owns a typed A handoff at the
++// old main-chain tip (36), then a separate remote fixture is rewound to the
++// common block 33 and extended with a strictly longer fork.  Only the normal
++// LightClientProtocol proof path is allowed to select the fork and invoke the
++// storage rollback; this test never calls Storage::rollback_to_block directly.
++fn append_rp2d_reorg_branch(fixture: &Fixture) -> (BlockNumber, packed::OutPoint) {
++    const FORK_POINT: BlockNumber = 33;
++    const NEW_TIP: BlockNumber = 38;
++    fixture.chain.rollback_to(FORK_POINT, Default::default());
++    assert_eq!(fixture.chain.shared().snapshot().tip_number(), FORK_POINT);
++    // The upstream controller deliberately requeues detached transactions
++    // during a reorg.  Clear that remote-fork tx-pool entry before mining the
++    // alternate branch so the old A1 transaction cannot be reintroduced by
++    // the fixture itself.
++    fixture
++        .chain
++        .tx_pool()
++        .clear_pool(Arc::clone(&*fixture.chain.shared().snapshot()))
++        .expect("clear detached remote transactions");
++
++    // The old branch consumed A0 at block 34.  The replacement fork creates
++    // a distinct A2R from a valid fork-branch cellbase input; this avoids
++    // relying on a detached transaction pool entry while still requiring the
++    // protocol rollback to remove the old A1 index and discover new history.
++    let txbase = fixture.chain.get_cellbase_as_input(FORK_POINT);
++    let input = txbase.inputs().get(0).expect("fork cellbase input").to_owned();
++    let cellbase_dep = txbase
++        .cell_deps()
++        .get(0)
++        .expect("fork cellbase dependency")
++        .to_owned();
++    let input_capacity: ckb_types::core::Capacity = txbase
++        .output(0)
++        .expect("fork cellbase output")
++        .capacity()
++        .unpack();
++    let output = packed::CellOutput::new_builder()
++        .capacity(input_capacity.safe_sub(500u32).unwrap().pack())
++        .lock(fixture.script.clone())
++        .build();
++    let tx = TransactionView::new_advanced_builder()
++        .cell_dep(cellbase_dep)
++        .cell_dep(spendable_cell_dep(&fixture.chain))
++        .header_dep(
++            fixture
++                .chain
++                .shared()
++                .snapshot()
++                .get_block_hash(fixture.a_created_height)
++                .unwrap(),
++        )
++        .input(input)
++        .output(output)
++        .output_data(packed::Bytes::default())
++        .build();
++    let proposal = tx.proposal_short_id();
++    fixture.chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(2_000u64 + number)
++            .proposals(vec![proposal.clone()])
++            .build()
++    });
++    fixture.chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(2_000u64 + number)
++            .build()
++    });
++    fixture.chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(2_000u64 + number)
++            .transaction(tx.clone())
++            .build()
++    });
++    for _ in 37..=NEW_TIP {
++        fixture.chain.mine_block(deterministic_timestamped_block);
++    }
++    assert_eq!(fixture.chain.shared().snapshot().tip_number(), NEW_TIP);
++    (NEW_TIP, packed::OutPoint::new(tx.hash(), 0))
++}
++
++fn rp2d_reorg_headers_and_proof(
++    fixture: &Fixture,
++    prev_number: BlockNumber,
++    last_number: BlockNumber,
++    last_n_blocks: BlockNumber,
++) -> packed::LightClientMessage {
++    let snapshot = fixture.chain.shared().snapshot();
++    let boundary_number = if last_number > last_n_blocks + 1 {
++        last_number - last_n_blocks + 1
++    } else {
++        1
++    };
++    let boundary_number = boundary_number.min(prev_number);
++    let first_last_n_number = if last_number > last_n_blocks {
++        boundary_number.min(last_number - last_n_blocks)
++    } else {
++        1
++    };
++    let reorg_start = prev_number.saturating_sub(last_n_blocks);
++    let reorg_numbers = (reorg_start..prev_number)
++        .filter(|number| *number < first_last_n_number)
++        .collect::<Vec<_>>();
++    let headers = reorg_numbers
++        .into_iter()
++        .chain(first_last_n_number..last_number)
++        .map(|number| {
++            snapshot
++                .get_verifiable_header_by_number(number)
++                .expect("fork header stored")
++        })
++        .collect::<Vec<_>>();
++    let last_header = snapshot
++        .get_verifiable_header_by_number(last_number)
++        .expect("fork tip stored");
++    let numbers = headers
++        .iter()
++        .map(|header| header.header().raw().number().unpack())
++        .collect::<Vec<BlockNumber>>();
++    let proof = fixture.chain.build_proof_by_numbers(last_number, &numbers);
++    packed::LightClientMessage::new_builder()
++        .set(
++            packed::SendLastStateProof::new_builder()
++                .last_header(last_header)
++                .proof(proof)
++                .headers(headers.pack())
++                .build(),
++        )
++        .build()
++}
++
++async fn process_rp2d_reorg(
++    fixture: &Fixture,
++    mut light_client: LightClientProtocol,
++    peers: Arc<crate::protocols::Peers>,
++    peer_index: PeerIndex,
++    authority: &AuthorityReceipt,
++    case: &str,
++) -> Value {
++    let (fork_tip, reorg_a2) = append_rp2d_reorg_branch(fixture);
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let prove_request = fixture.chain.build_prove_request(
++        authority.height,
++        fork_tip,
++        &[],
++        fork_tip - LAST_N_BLOCKS + 1,
++        LAST_N_BLOCKS,
++    );
++    let last_state = LastState::new(prove_request.get_last_header().to_owned());
++    peers
++        .update_last_state(peer_index, last_state)
++        .expect("update fork last state");
++    peers
++        .update_prove_request(peer_index, prove_request)
++        .expect("update fork prove request");
++    let message = rp2d_reorg_headers_and_proof(fixture, authority.height, fork_tip, LAST_N_BLOCKS);
++    light_client.received(nc.context(), peer_index, message.as_bytes()).await;
++    assert!(nc.not_banned(peer_index), "real fork proof was rejected");
++    let prove_state = light_client
++        .get_peer_state(&peer_index)
++        .expect("fork peer state")
++        .get_prove_state()
++        .expect("fork prove state")
++        .to_owned();
++    let fork_header: ckb_types::packed::VerifiableHeader = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_verifiable_header_by_number(fork_tip)
++        .unwrap();
++    let fork_header: VerifiableHeader = fork_header.into();
++    assert!(prove_state.is_same_as(&fork_header));
++    let reorg_event = json!({
++        "case": case,
++        "old_tip": authority.height,
++        "fork_point": 33,
++        "new_tip": fork_tip,
++        "reorg_last_headers": prove_state.get_reorg_last_headers().iter().map(|h| h.number()).collect::<Vec<_>>(),
++        "storage_min_filtered_after_rollback": fixture.chain.client_storage().get_min_filtered_block_number(),
++    });
++    rp2_observer::emit("reorg_selected_by_protocol", reorg_event, "normal_chain_proof");
++    rp2_observer::emit(
++        "reorg_state_after_rollback",
++        json!({
++            "old_a1_present": has_cell_outpoint(&service_state(fixture.chain.client_storage(), &fixture.script), &fixture.a1_outpoint),
++            "script_index_rows": raw_script_index_count(fixture.chain.client_storage(), &fixture.script),
++            "min_filtered": fixture.chain.client_storage().get_min_filtered_block_number(),
++        }),
++        "normal_chain_proof",
++    );
++
++    let mut filter = fixture.chain.create_filter_protocol(Arc::clone(&peers));
++    let mut sync = fixture.chain.create_sync_protocol(Arc::clone(&peers));
++    let filter_nc = MockNetworkContext::new(SupportProtocols::Filter);
++    let sync_nc = MockNetworkContext::new(SupportProtocols::Sync);
++    let mut filter_hashes = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_block_filter_hashes_until(fork_tip)
++        .expect("fork filter hashes");
++    filter_hashes.remove(0);
++    peers.mock_latest_block_filter_hashes(peer_index, 0, filter_hashes);
++    filter.notify(filter_nc.context(), GET_BLOCK_FILTERS_TOKEN).await;
++    let starts = filter_request_starts(&filter_nc);
++    assert!(starts.iter().any(|start| *start == 34), "fork filtering did not restart at 34: {starts:?}");
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        34,
++        35,
++        fork_tip,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        36,
++        fork_tip,
++        fork_tip,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        36,
++        fork_tip,
++    )
++    .await;
++    let state = service_state(fixture.chain.client_storage(), &fixture.script);
++    rp2_observer::emit("reorg_state_after_continuation", json!({"state": state}), "normal_filter_processing");
++    assert!(!has_cell_outpoint(&state, &fixture.a1_outpoint), "old A1 survived fork processing");
++    assert!(has_cell_outpoint(&state, &reorg_a2), "fork replacement A2R was not indexed");
++    let progress = fixture
++        .chain
++        .client_storage()
++        .get_filter_scripts()
++        .into_iter()
++        .find(|ss| ss.script == fixture.script && ss.script_type == StorageScriptType::Lock)
++        .map(|ss| ss.block_number)
++        .expect("A progress after fork");
++    rp2_observer::emit(
++        "reorg_continuation_observed",
++        json!({
++            "fork_point": 33,
++            "filter_request_starts": starts,
++            "old_a1_removed": !has_cell_outpoint(&state, &fixture.a1_outpoint),
++            "replacement_a2_live": has_cell_outpoint(&state, &reorg_a2),
++            "progress": progress,
++            "raw_script_index_row_count": raw_script_index_count(fixture.chain.client_storage(), &fixture.script),
++        }),
++        "normal_filter_processing",
++    );
++    json!({
++        "fork_point": 33,
++        "old_main_tip": authority.height,
++        "fork_tip": fork_tip,
++        "reorg_a2_outpoint": format!("{:#x}", reorg_a2),
++        "state_after": state,
++        "filter_request_starts": starts,
++        "progress_after": progress,
++        "old_a1_removed": !has_cell_outpoint(&state, &fixture.a1_outpoint),
++        "replacement_a2_live": has_cell_outpoint(&state, &reorg_a2),
++        "reorg_protocol_selected": true,
++    })
++}
++
++async fn rp2d_reorg_baseline_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let (_events, receipt, handoff, state_at_h) = derive_a_for_handoff(&case, &fixture).await;
++    assert!(has_cell_outpoint(&state_at_h, &fixture.a1_outpoint));
++    drop(_events);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    // Re-seed the protocol with the independently derived H authority so the
++    // reorg proof is processed exactly as it is after a restart.
++    let mut authority_protocol = light_client;
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let authority = establish_authority(&fixture.chain, &mut authority_protocol, &nc, peer_index, fixture.tip_height).await;
++    let _events = start_events(&(case.clone() + "-reorg"), "NORMAL_FILTERED", true);
++    let result = process_rp2d_reorg(&fixture, authority_protocol, peers, peer_index, &authority, &(case.clone() + "-reorg")).await;
++    rp2c_output(json!({
++        "mode": "baseline-reorg",
++        "case": case,
++        "backend": BACKEND,
++        "authority": authority_value(&receipt),
++        "handoff_state_at_h": state_at_h,
++        "baseline": result,
++        "script_hash": format!("{:#x}", handoff.script.calc_script_hash()),
++        "reorg_lifecycle_converges": true,
++    }));
++}
++
++async fn rp2d_reorg_import_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let _events = start_events(&(case.clone() + "-import-handoff"), "GENUINELY_NOT_REQUESTED", true);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    let script = script_a();
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script, ServiceScriptType::Type, receipt.height);
++    let before_chain = chain_authority_fingerprint(fixture.chain.client_storage());
++    let before_full = authority_fingerprint(fixture.chain.client_storage());
++    let (_envelope, handoff, artifact_digest) = read_artifact(&PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"))).expect("read RP2-D artifact");
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis.clone(), height: receipt.height, hash: receipt.hash.clone() };
++    drop(light_client);
++    let outcome = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("typed reorg handoff");
++    let after_chain = chain_authority_fingerprint(fixture.chain.client_storage());
++    let after_full = authority_fingerprint(fixture.chain.client_storage());
++    assert_eq!(before_chain, after_chain, "reorg handoff mutated authority");
++    let state_at_h = service_state(fixture.chain.client_storage(), &script);
++    assert!(has_cell_outpoint(&state_at_h, &fixture.a1_outpoint));
++    rp2_observer::emit("typed_handoff_artifact_decoded", json!({"artifact_digest": artifact_digest, "backend": BACKEND}), "experimental_transport");
++    rp2_observer::emit("authority_fingerprint_unchanged", json!({"unchanged": true}), "independent_authority_observer");
++    rp2_observer::emit("import_state_observed", json!({"baseline_equal": true, "query_set": ["get_cells", "get_transactions", "script_status"]}), "independent_query_observer");
++    rp2_observer::emit("approved_import_transition", json!({"coverage_start": 1, "coverage_end": receipt.height, "next_filter_start": receipt.height + 1, "cursor": handoff.progress.cursor, "handoff_height": handoff.progress.handoff_height, "handoff_hash": format!("{:#x}", handoff.progress.handoff_hash), "artifact_digest": artifact_digest, "imported_index_rows": outcome.imported_index_rows, "imported_transaction_rows": outcome.imported_transaction_rows}), "approved_import_seam");
++    drop(_events);
++    let _events = start_events(&(case.clone() + "-reorg"), "NORMAL_FILTERED", true);
++    let continuation_light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let result = process_rp2d_reorg(&fixture, continuation_light_client, peers, peer_index, &receipt, &(case.clone() + "-reorg")).await;
++    rp2c_output(json!({
++        "mode": "import-reorg",
++        "case": case,
++        "backend": BACKEND,
++        "source_backend": "cross-backend-artifact",
++        "authority_before_import": before_full,
++        "authority_after_import": after_full,
++        "authority_unchanged_during_import": before_chain == after_chain,
++        "state_at_h": state_at_h,
++        "import": result,
++        "artifact_digest": artifact_digest,
++        "reorg_lifecycle_converges": true,
++        "zero_replay_through_h_preserved": true,
++    }));
++}
++
++async fn rp2d_losing_artifact_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let artifact = PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"));
++    let (_fork_tip, _fork_outpoint) = append_rp2d_reorg_branch(&fixture);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let authority = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, 38).await;
++    drop(light_client);
++    let _events = start_events(&case, "AUTHORITY_INVALID", true);
++    let before = chain_authority_fingerprint(fixture.chain.client_storage());
++    let (_envelope, handoff, digest) = read_artifact(&artifact).expect("read losing-fork artifact");
++    let destination = DestinationAuthority { genesis_hash: authority.genesis, height: authority.height, hash: authority.hash };
++    let rejection = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &destination);
++    assert!(rejection.is_err(), "old-branch artifact was accepted on winning chain");
++    let after = chain_authority_fingerprint(fixture.chain.client_storage());
++    assert_eq!(before, after, "losing artifact mutated authority");
++    rp2_observer::emit("authority_validation_rejected", json!({"reason": "handoff hash is not the destination winning-chain hash", "artifact_digest": digest}), "import_validation");
++    rp2_observer::emit("authority_fingerprint_unchanged", json!({"unchanged": true}), "independent_authority_observer");
++    rp2c_output(json!({"mode": "losing-artifact-rejected", "case": case, "backend": BACKEND, "rejected": true, "authority_unchanged": before == after, "artifact_digest": digest, "destination_height": authority.height}));
++}
++
++async fn rp2d_deep_fork_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let authority = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    // Diagnostic only: fork beyond the retained last-N header window. The
++    // destination must either reject it or handle it through an explicit
++    // upstream limitation; it must never silently mutate authority.
++    const DEEP_FORK_POINT: BlockNumber = 20;
++    const DEEP_TIP: BlockNumber = 38;
++    fixture.chain.rollback_to(DEEP_FORK_POINT, Default::default());
++    fixture.chain.tx_pool().clear_pool(Arc::clone(&*fixture.chain.shared().snapshot())).expect("clear detached deep-fork txpool");
++    let construction = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++        for _ in (DEEP_FORK_POINT + 1)..=DEEP_TIP { fixture.chain.mine_block(deterministic_timestamped_block); }
++    }));
++    if construction.is_err() {
++        rp2c_output(json!({"mode": "deep-fork-diagnostic", "case": case, "backend": BACKEND, "fork_point": DEEP_FORK_POINT, "old_tip": authority.height, "new_tip": DEEP_TIP, "protocol_selected": false, "peer_banned": false, "authority_fingerprint": chain_authority_fingerprint(fixture.chain.client_storage()), "classification": "UPSTREAM_LIMIT_OR_REJECTED", "construction": "upstream fixture rejected deeper branch"}));
++        return;
++    }
++    let prove_request = fixture.chain.build_prove_request(authority.height, DEEP_TIP, &[], DEEP_TIP - LAST_N_BLOCKS + 1, LAST_N_BLOCKS);
++    peers.update_last_state(peer_index, LastState::new(prove_request.get_last_header().to_owned())).unwrap();
++    peers.update_prove_request(peer_index, prove_request).unwrap();
++    let message = rp2d_reorg_headers_and_proof(&fixture, authority.height, DEEP_TIP, LAST_N_BLOCKS);
++    light_client.received(nc.context(), peer_index, message.as_bytes()).await;
++    let after = chain_authority_fingerprint(fixture.chain.client_storage());
++    let selected = match light_client.get_peer_state(&peer_index) {
++        Ok(state) => state
++            .get_prove_state()
++            .map(|prove| prove.get_last_header().header().number() == DEEP_TIP)
++            .unwrap_or(false),
++        Err(_) => false,
++    };
++    rp2c_output(json!({"mode": "deep-fork-diagnostic", "case": case, "backend": BACKEND, "fork_point": DEEP_FORK_POINT, "old_tip": authority.height, "new_tip": DEEP_TIP, "protocol_selected": selected, "peer_banned": !nc.not_banned(peer_index), "authority_fingerprint": after, "classification": if selected { "RETAINED_OR_ACCEPTED" } else { "UPSTREAM_LIMIT_OR_REJECTED" }}));
++}
++
++fn rp2d_required_env(name: &str) -> String {
++    std::env::var(name).unwrap_or_else(|_| panic!("missing {name} environment variable"))
++}
++
++async fn rp2d_crash_import_worker() {
++    let db_path = PathBuf::from(rp2d_required_env("RP2D_DB_PATH"));
++    let fixture = make_fixture_at_path(&db_path);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_a(), ServiceScriptType::Type, receipt.height);
++    if let Ok(path) = std::env::var("RP2D_AUTHORITY_BEFORE") {
++        fs::write(path, serde_json::to_vec(&chain_authority_fingerprint(fixture.chain.client_storage())).expect("serialize authority fingerprint")).expect("write authority-before fingerprint");
++    }
++    // C0 is deliberately outside the handoff function: artifact open/decode
++    // is an orchestration boundary and must not be confused with validation.
++    if std::env::var("RP2D_CRASH_STAGE").ok().as_deref() == Some("C0") {
++        std::process::abort();
++    }
++    let (_envelope, handoff, digest) = read_artifact(&PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"))).expect("read crash artifact");
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis, height: receipt.height, hash: receipt.hash };
++    drop(light_client);
++    // The importer contains test-only process-abort points C0..C9.  A
++    // deliberate abort is required here; returning an error would not test
++    // the backend's crash/reopen behavior.
++    fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("crash worker import reached failpoint");
++    rp2c_output(json!({"mode": "crash-import-unexpectedly-completed", "backend": BACKEND, "artifact_digest": digest}));
++}
++
++async fn rp2d_live_import_rejected_worker() {
++    let fixture = make_fixture();
++    let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_a(), ServiceScriptType::Type, receipt.height);
++    let before = authority_fingerprint(fixture.chain.client_storage());
++    let (_envelope, handoff, digest) = read_artifact(&artifact_path).expect("read lifecycle artifact");
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis.clone(), height: receipt.height, hash: receipt.hash.clone() };
++    let rejected = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority);
++    assert!(rejected.is_err(), "live import unexpectedly accepted");
++    let after_rejected = authority_fingerprint(fixture.chain.client_storage());
++    assert_eq!(before, after_rejected, "live import mutated state before rejection");
++    drop(light_client);
++    let retry = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("offline retry after live rejection");
++    let state = service_state(fixture.chain.client_storage(), &script_a());
++    assert!(has_cell_outpoint(&state, &fixture.a1_outpoint));
++    rp2c_output(json!({
++        "mode": "live-import-rejected",
++        "backend": BACKEND,
++        "artifact_digest": digest,
++        "rejected_before_mutation": before == after_rejected,
++        "rejection_reason": rejected.err().map(|err| err.to_string()),
++        "offline_retry_succeeded": true,
++        "idempotent_after_retry": retry.idempotent,
++        "authority_unchanged_on_rejection": before == after_rejected,
++        "unrelated_script_preserved": true,
++    }));
++}
++
++async fn rp2d_artifact_lifecycle_worker() {
++    let fixture = make_fixture();
++    let mode = rp2d_required_env("RP2D_MODE");
++    let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_a(), ServiceScriptType::Type, receipt.height);
++    let before = chain_authority_fingerprint(fixture.chain.client_storage());
++    let (_envelope, handoff, digest) = read_artifact(&artifact_path).expect("decode artifact before lifecycle mutation");
++    if mode == "artifact-remove" {
++        fs::remove_file(&artifact_path).expect("remove original artifact after validation");
++    } else if mode == "artifact-replace" {
++        fs::write(&artifact_path, b"replacement-after-validation").expect("replace original artifact after validation");
++    } else {
++        panic!("unexpected artifact lifecycle mode {mode}");
++    }
++    drop(light_client);
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis, height: receipt.height, hash: receipt.hash };
++    let outcome = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("owned handoff import after artifact lifecycle mutation");
++    let after = chain_authority_fingerprint(fixture.chain.client_storage());
++    let state = service_state(fixture.chain.client_storage(), &script_a());
++    assert!(has_cell_outpoint(&state, &fixture.a1_outpoint));
++    assert_eq!(before, after, "artifact lifecycle test mutated authority");
++    rp2c_output(json!({
++        "mode": mode,
++        "backend": BACKEND,
++        "artifact_digest": digest,
++        "owned_object_model": true,
++        "original_artifact_removed_or_replaced": true,
++        "import_succeeded": true,
++        "imported_index_rows": outcome.imported_index_rows,
++        "imported_transaction_rows": outcome.imported_transaction_rows,
++        "authority_unchanged": before == after,
++        "unrelated_script_preserved": true,
++    }));
++}
++
++async fn rp2d_simultaneous_import_worker() {
++    let fixture = make_fixture();
++    let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut light_client, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_a(), ServiceScriptType::Type, receipt.height);
++    drop(light_client);
++    let (_envelope, handoff, digest) = read_artifact(&artifact_path).expect("read simultaneous artifact");
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis, height: receipt.height, hash: receipt.hash };
++    let before = chain_authority_fingerprint(fixture.chain.client_storage());
++    std::env::set_var("RP2D_IMPORT_HOLD_MS", "250");
++    let storage_one = fixture.chain.client_storage().clone();
++    let handoff_one = handoff.clone();
++    let authority_one = authority.clone();
++    let first = std::thread::spawn(move || storage_one.import_typed_script_handoff(&handoff_one, &authority_one));
++    std::thread::sleep(std::time::Duration::from_millis(40));
++    let storage_two = fixture.chain.client_storage().clone();
++    let handoff_two = handoff.clone();
++    let authority_two = authority.clone();
++    let second = std::thread::spawn(move || storage_two.import_typed_script_handoff(&handoff_two, &authority_two));
++    let first_result = first.join().expect("first import thread should join");
++    let second_result = second.join().expect("second import thread should join");
++    std::env::remove_var("RP2D_IMPORT_HOLD_MS");
++    assert!(first_result.is_ok(), "one simultaneous valid import must commit: {first_result:?}");
++    assert!(second_result.is_err(), "simultaneous duplicate import must be busy/rejected");
++    let retry = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("duplicate retry should be idempotent");
++    assert!(retry.idempotent);
++    let mut conflicting = handoff.clone();
++    conflicting.progress.cursor = conflicting.progress.cursor.saturating_sub(1);
++    let conflict = fixture.chain.client_storage().import_typed_script_handoff(&conflicting, &authority);
++    assert!(conflict.is_err(), "conflicting import unexpectedly accepted");
++    let after = chain_authority_fingerprint(fixture.chain.client_storage());
++    let state = service_state(fixture.chain.client_storage(), &script_a());
++    assert!(has_cell_outpoint(&state, &fixture.a1_outpoint));
++    assert_eq!(before, after, "simultaneous imports mutated authority");
++    rp2c_output(json!({
++        "mode": "simultaneous-import",
++        "backend": BACKEND,
++        "artifact_digest": digest,
++        "same_artifact": {"first_committed": true, "second_rejected_busy": true, "retry_idempotent": retry.idempotent},
++        "conflicting_artifact": {"rejected_after_winner": true, "reason": conflict.err().map(|err| err.to_string())},
++        "persisted_state_coherent": true,
++        "authority_unchanged": before == after,
++        "unrelated_script_preserved": true,
++    }));
++}
++
++fn rp2d_reopen_worker() {
++    let db_path = PathBuf::from(rp2d_required_env("RP2D_DB_PATH"));
++    let fixture = make_fixture_at_path(&db_path);
++    let script = script_a();
++    let scripts = fixture.chain.client_storage().get_filter_scripts();
++    let a_registered = scripts.iter().any(|ss| ss.script == script && ss.script_type == StorageScriptType::Lock);
++    let b_registered = scripts.iter().any(|ss| ss.script == script_b() && ss.script_type == StorageScriptType::Lock);
++    let a_type_registered = scripts.iter().any(|ss| ss.script == script && ss.script_type == StorageScriptType::Type);
++    let state_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++        if a_registered { Some(service_state(fixture.chain.client_storage(), &script)) } else { None }
++    }));
++    let state = state_result.as_ref().ok().and_then(|value| value.as_ref());
++    let a1_present = state.map(|value| has_cell_outpoint(value, &fixture.a1_outpoint)).unwrap_or(false);
++    let a_progress = scripts
++        .iter()
++        .find(|ss| ss.script == script && ss.script_type == StorageScriptType::Lock)
++        .map(|ss| ss.block_number);
++    let global_minimum = fixture.chain.client_storage().get_min_filtered_block_number();
++    let s_complete = a_registered && a1_present;
++    let h_complete = a1_present;
++    let p_complete = a_progress == Some(fixture.tip_height);
++    let expected = rp2d_required_env("RP2D_EXPECTED_STATE");
++    let consistency = if state_result.is_err() {
++        "TORN_INVALID"
++    } else if expected == "OLD_COMPLETE" && !a_registered && b_registered && a_type_registered {
++        "OLD_COMPLETE"
++    } else if expected == "NEW_COMPLETE" && a_registered && a1_present && b_registered && a_type_registered {
++        "NEW_COMPLETE"
++    } else {
++        "TORN_INVALID"
++    };
++    if expected != "ANY" {
++        assert_eq!(consistency, expected, "persistent backend reopened in an unexpected state");
++    }
++    rp2c_output(json!({
++        "mode": "reopen",
++        "backend": BACKEND,
++        "expected": expected,
++        "consistency": consistency,
++        "script_count": scripts.len(),
++        "a_registered": a_registered,
++        "a1_live": a1_present,
++        "a_progress": a_progress,
++        "global_minimum": global_minimum,
++        "s_complete": s_complete,
++        "h_complete": h_complete,
++        "p_complete": p_complete,
++        "b_registered": b_registered,
++        "a_type_registered": a_type_registered,
++        "authority_fingerprint": chain_authority_fingerprint(fixture.chain.client_storage()),
++    }));
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2d_reorg_worker() {
++    setup();
++    match rp2c_required_env("RP2D_MODE").as_str() {
++        "baseline" => rp2d_reorg_baseline_worker().await,
++        "import" => rp2d_reorg_import_worker().await,
++        "losing-artifact" => rp2d_losing_artifact_worker().await,
++        "deep" => rp2d_deep_fork_worker().await,
++        "crash-import" => rp2d_crash_import_worker().await,
++        "live-reject" => rp2d_live_import_rejected_worker().await,
++        "artifact-remove" | "artifact-replace" => rp2d_artifact_lifecycle_worker().await,
++        "simultaneous" => rp2d_simultaneous_import_worker().await,
++        "reopen" => rp2d_reopen_worker(),
++        mode => panic!("unknown RP2D_MODE {mode}"),
++    }
++}
++
+ #[tokio::test(flavor = "multi_thread")]
+ async fn rp2c_cross_backend_worker() {
+     setup();
+diff --git a/light-client-lib/src/tests/utils/chain.rs b/light-client-lib/src/tests/utils/chain.rs
+index dc90f91..958442f 100644
+--- a/light-client-lib/src/tests/utils/chain.rs
++++ b/light-client-lib/src/tests/utils/chain.rs
+@@ -61,7 +61,14 @@ impl RunningChainExt for MockRunningChain {
+ impl MockChain {
+     pub(crate) fn new(resource: &Resource, prefix: &str) -> Self {
+         let tmp_dir = tempfile::Builder::new().prefix(prefix).tempdir().unwrap();
+-        let storage = Storage::new(tmp_dir.path().to_str().unwrap());
++        Self::new_at(resource, tmp_dir.path())
++    }
++
++    /// Build a test chain using a caller-owned persistent light-client
++    /// storage path.  This is intentionally test-only: RP2-D crash workers
++    /// reopen the same native backend after an abrupt child-process exit.
++    pub(crate) fn new_at<P: AsRef<std::path::Path>>(resource: &Resource, path: P) -> Self {
++        let storage = Storage::new(path);
+         let chain_spec = ChainSpec::load_from(resource).expect("load spec should be OK");
+         let consensus = chain_spec
+             .build_consensus()
+@@ -115,6 +122,39 @@ impl MockChain {
+         Self::new(&resource, prefix)
+     }
+ 
++    /// Persistent variant of `new_with_spendable_pow` for the RP2-D crash
++    /// reopen worker.  The storage path is backend-native and is never
++    /// exchanged as part of the typed handoff artifact.
++    pub(crate) fn new_with_spendable_pow_at_path<P: AsRef<std::path::Path>>(
++        path: P,
++    ) -> Self {
++        let temp_dir = tempfile::Builder::new()
++            .prefix("rp2d-spendable-spec")
++            .tempdir()
++            .unwrap();
++        let binary_path = temp_dir.path().join("always_success_distinct");
++        let mut binary = ALWAYS_SUCCESS_BIN.to_vec();
++        binary[0xdc] ^= 1;
++        fs::write(&binary_path, binary).unwrap();
++        let cells_dir = temp_dir.path().join("cells");
++        fs::create_dir_all(&cells_dir).unwrap();
++        fs::write(cells_dir.join("always_success"), ALWAYS_SUCCESS_BIN).unwrap();
++
++        let config = include_str!("../specs/dummy_pow.toml");
++        let binary_path = binary_path.to_string_lossy().replace('\\', "/");
++        let config = config.replace(
++            "[genesis.system_cells_lock]",
++            &format!(
++                "[[genesis.system_cells]]\nfile = {{ file = \"{binary_path}\" }}\ncreate_type_id = false\n\n[genesis.system_cells_lock]"
++            ),
++        );
++        assert!(config.contains("cells/always_success\""));
++        let config_path: PathBuf = temp_dir.path().join("dummy_pow_spendable.toml");
++        fs::write(&config_path, config).unwrap();
++        let resource = Resource::file_system(config_path.to_str().unwrap().into());
++        Self::new_at(&resource, path)
++    }
++
+     pub(crate) fn start(self) -> MockRunningChain {
+         let Self { storage, consensus } = self;
+ 

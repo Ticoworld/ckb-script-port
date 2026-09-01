@@ -1,0 +1,976 @@
+diff --git a/light-client-lib/src/lib.rs b/light-client-lib/src/lib.rs
+index 078a29f..7a3c05f 100644
+--- a/light-client-lib/src/lib.rs
++++ b/light-client-lib/src/lib.rs
+@@ -7,6 +7,9 @@ pub(crate) mod tests;
+ #[cfg(test)]
+ pub(crate) mod rp2_observer;
+ 
++#[cfg(test)]
++pub(crate) mod rp2_handoff;
++
+ pub mod error;
+ pub mod protocols;
+ pub mod service;
+diff --git a/light-client-lib/src/rp2_handoff.rs b/light-client-lib/src/rp2_handoff.rs
+new file mode 100644
+index 0000000..37efe9a
+--- /dev/null
++++ b/light-client-lib/src/rp2_handoff.rs
+@@ -0,0 +1,369 @@
++//! RP2-B typed Script handoff seam.
++//!
++//! This module is compiled only for the disposable RP2 test build.  It is a
++//! typed adapter over the real `LightClientStorage` key/value semantics; it is
++//! deliberately not a public package format or a general raw-KV importer.
++
++use std::collections::{HashMap, HashSet};
++
++use ckb_types::{core::BlockNumber, packed::{Byte32, Script, Transaction}, prelude::*};
++
++use crate::storage::{
++    extract_raw_data, BatchWriter, IteratorDirection, IteratorStart, Key, KeyPrefix,
++    LightClientStorage, ScriptStatus, ScriptType, StorageBackend,
++};
++
++pub const HANDOFF_FORMAT_VERSION: u32 = 1;
++
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++pub enum HandoffRole {
++    Lock,
++    Type,
++}
++
++impl HandoffRole {
++    fn script_type(self) -> ScriptType {
++        match self {
++            Self::Lock => ScriptType::Lock,
++            Self::Type => ScriptType::Type,
++        }
++    }
++
++    fn index_prefix(self) -> u8 {
++        match self {
++            Self::Lock => KeyPrefix::CellLockScript as u8,
++            Self::Type => KeyPrefix::CellTypeScript as u8,
++        }
++    }
++
++    fn transaction_prefix(self) -> u8 {
++        match self {
++            Self::Lock => KeyPrefix::TxLockScript as u8,
++            Self::Type => KeyPrefix::TxTypeScript as u8,
++        }
++    }
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct HandoffRow {
++    pub key: Vec<u8>,
++    pub value: Vec<u8>,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct ScriptDerivedState {
++    pub index_rows: Vec<HandoffRow>,
++    pub transaction_index_rows: Vec<HandoffRow>,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct HistoricalClosure {
++    /// Transaction rows needed by the Script indexes and by future spends.
++    pub transaction_rows: Vec<HandoffRow>,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct ScriptProgress {
++    pub cursor: BlockNumber,
++    pub handoff_height: BlockNumber,
++    pub handoff_hash: Byte32,
++    pub genesis_hash: Byte32,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct TypedScriptHandoff {
++    pub format_version: u32,
++    pub script: Script,
++    pub role: HandoffRole,
++    pub state: ScriptDerivedState,
++    pub closure: HistoricalClosure,
++    pub progress: ScriptProgress,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct DestinationAuthority {
++    pub genesis_hash: Byte32,
++    pub height: BlockNumber,
++    pub hash: Byte32,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub struct ImportOutcome {
++    pub idempotent: bool,
++    pub imported_index_rows: usize,
++    pub imported_transaction_rows: usize,
++    pub recomputed_min_filtered: BlockNumber,
++}
++
++#[derive(Clone, Debug, Eq, PartialEq)]
++pub enum HandoffError {
++    Invalid(String),
++    Storage(String),
++}
++
++impl std::fmt::Display for HandoffError {
++    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
++        match self {
++            Self::Invalid(s) | Self::Storage(s) => f.write_str(s),
++        }
++    }
++}
++
++impl std::error::Error for HandoffError {}
++
++fn collect_prefix<S: StorageBackend>(storage: &S, prefix: Vec<u8>) -> Vec<HandoffRow> {
++    let end = prefix.clone();
++    storage
++        .collect_iterator(
++            IteratorStart::From(prefix),
++            IteratorDirection::Forward,
++            Box::new(move |key| key.starts_with(&end)),
++            Box::new(|_key, value| Some(value.to_vec())),
++            usize::MAX,
++        )
++        .into_iter()
++        .map(|kv| HandoffRow { key: kv.key, value: kv.value })
++        .collect()
++}
++
++fn read<S: StorageBackend>(storage: &S, key: Vec<u8>) -> Result<Vec<u8>, HandoffError> {
++    storage
++        .get(key)
++        .map_err(|e| HandoffError::Storage(e.to_string()))?
++        .ok_or_else(|| HandoffError::Invalid("required row is missing".to_owned()))
++}
++
++fn script_key_prefix(script: &Script, _role: HandoffRole, prefix: u8) -> Vec<u8> {
++    let mut key = vec![prefix];
++    key.extend_from_slice(&extract_raw_data(script));
++    key
++}
++
++fn registration_key(script: &Script, role: HandoffRole) -> Vec<u8> {
++    let mut key = Key::Meta("FILTER_SCRIPTS").into_vec();
++    key.extend_from_slice(script.as_slice());
++    key.push(match role { HandoffRole::Lock => 0, HandoffRole::Type => 1 });
++    key
++}
++
++fn validate_transaction_row(row: &HandoffRow) -> Result<Byte32, HandoffError> {
++    if row.key.len() != 33 || row.key[0] != KeyPrefix::TxHash as u8 {
++        return Err(HandoffError::Invalid("closure contains a non-TxHash row".to_owned()));
++    }
++    if row.value.len() < 12 {
++        return Err(HandoffError::Invalid("transaction row is truncated".to_owned()));
++    }
++    Transaction::from_slice(&row.value[12..])
++        .map_err(|_| HandoffError::Invalid("closure contains invalid packed transaction".to_owned()))?;
++    Byte32::from_slice(&row.key[1..]).map_err(|_| HandoffError::Invalid("invalid TxHash key".to_owned()))
++}
++
++fn validate_index_row(row: &HandoffRow, script: &Script, role: HandoffRole) -> Result<Byte32, HandoffError> {
++    let raw = extract_raw_data(script);
++    let expected_prefix = if row.key.first() == Some(&role.index_prefix()) {
++        role.index_prefix()
++    } else if row.key.first() == Some(&role.transaction_prefix()) {
++        role.transaction_prefix()
++    } else {
++        return Err(HandoffError::Invalid("state row has wrong Script role prefix".to_owned()));
++    };
++    let suffix_len = if expected_prefix == role.index_prefix() { 16 } else { 17 };
++    if row.key.len() != 1 + raw.len() + suffix_len || !row.key[1..1 + raw.len()].eq(raw.as_slice()) {
++        return Err(HandoffError::Invalid("state row is not bound to the exact packed Script".to_owned()));
++    }
++    if row.value.len() != 32 {
++        return Err(HandoffError::Invalid("state row value is not a transaction hash".to_owned()));
++    }
++    Byte32::from_slice(&row.value).map_err(|_| HandoffError::Invalid("invalid state TxHash".to_owned()))
++}
++
++fn all_rows_unique(rows: impl Iterator<Item = HandoffRow>) -> Result<Vec<HandoffRow>, HandoffError> {
++    let mut seen = HashSet::new();
++    let mut output = Vec::new();
++    for row in rows {
++        if !seen.insert(row.key.clone()) {
++            return Err(HandoffError::Invalid("duplicate handoff key".to_owned()));
++        }
++        output.push(row);
++    }
++    Ok(output)
++}
++
++pub trait TypedScriptHandoffStorage: LightClientStorage {
++    /// Export exact Script-role index rows and the minimum transaction closure.
++    fn export_typed_script_handoff(
++        &self,
++        script: Script,
++        role: HandoffRole,
++        handoff_height: BlockNumber,
++    ) -> Result<TypedScriptHandoff, HandoffError>
++    where
++        Self: Sized,
++    {
++        let script_type = role.script_type();
++        let status = self
++            .get_filter_scripts()
++            .into_iter()
++            .find(|ss| ss.script == script && ss.script_type == script_type)
++            .ok_or_else(|| HandoffError::Invalid("Script/role is not registered".to_owned()))?;
++        if status.block_number > handoff_height {
++            return Err(HandoffError::Invalid("source cursor exceeds handoff height".to_owned()));
++        }
++        // The accepted authority tip is stored as LAST_STATE even when the
++        // block had no Script match.  Prefer that chain-bound fact at the tip;
++        // older handoff boundaries must already have a real block-number row.
++        let tip = self.get_tip_header();
++        let tip_number: BlockNumber = tip.raw().number().unpack();
++        let handoff_hash = if tip_number == handoff_height {
++            tip.calc_header_hash()
++        } else {
++            self.get_block_hash(handoff_height).ok_or_else(|| {
++                HandoffError::Invalid("source handoff block is unavailable".to_owned())
++            })?
++        };
++        let genesis_hash = self.get_genesis_block().calc_header_hash();
++
++        let index_rows = collect_prefix(self, script_key_prefix(&script, role, role.index_prefix()));
++        let transaction_index_rows = collect_prefix(self, script_key_prefix(&script, role, role.transaction_prefix()));
++        let mut tx_hashes = HashSet::new();
++        for row in index_rows.iter().chain(transaction_index_rows.iter()) {
++            tx_hashes.insert(validate_index_row(row, &script, role)?);
++        }
++        let mut transaction_rows = Vec::with_capacity(tx_hashes.len());
++        for tx_hash in tx_hashes {
++            let key = Key::TxHash(&tx_hash).into_vec();
++            let value = read(self, key.clone())?;
++            let row = HandoffRow { key, value };
++            validate_transaction_row(&row)?;
++            transaction_rows.push(row);
++        }
++        transaction_rows.sort_by(|a, b| a.key.cmp(&b.key));
++        Ok(TypedScriptHandoff {
++            format_version: HANDOFF_FORMAT_VERSION,
++            script,
++            role,
++            state: ScriptDerivedState { index_rows, transaction_index_rows },
++            closure: HistoricalClosure { transaction_rows },
++            progress: ScriptProgress {
++                cursor: status.block_number,
++                handoff_height,
++                handoff_hash,
++                genesis_hash,
++            },
++        })
++    }
++
++    /// Validate and atomically install a typed handoff without writing C/R rows.
++    fn import_typed_script_handoff(
++        &self,
++        handoff: &TypedScriptHandoff,
++        authority: &DestinationAuthority,
++    ) -> Result<ImportOutcome, HandoffError>
++    where
++        Self: Sized,
++    {
++        if handoff.format_version != HANDOFF_FORMAT_VERSION {
++            return Err(HandoffError::Invalid("unsupported handoff format version".to_owned()));
++        }
++        if handoff.progress.genesis_hash != authority.genesis_hash {
++            return Err(HandoffError::Invalid("genesis mismatch".to_owned()));
++        }
++        if handoff.progress.handoff_height != authority.height
++            || handoff.progress.handoff_hash != authority.hash
++            || handoff.progress.cursor > authority.height
++        {
++            return Err(HandoffError::Invalid("handoff identity does not match destination authority".to_owned()));
++        }
++        let stored_genesis = self.get_genesis_block().calc_header_hash();
++        if stored_genesis != authority.genesis_hash {
++            return Err(HandoffError::Invalid("destination genesis mismatch".to_owned()));
++        }
++        let tip = self.get_tip_header();
++        let tip_number: BlockNumber = tip.raw().number().unpack();
++        if tip_number != authority.height || tip.calc_header_hash() != authority.hash {
++            return Err(HandoffError::Invalid("destination tip is not independently verified".to_owned()));
++        }
++
++        let state_rows = all_rows_unique(
++            handoff
++                .state
++                .index_rows
++                .iter()
++                .chain(handoff.state.transaction_index_rows.iter())
++                .cloned(),
++        )?;
++        let closure_rows = all_rows_unique(handoff.closure.transaction_rows.iter().cloned())?;
++        let mut referenced = HashSet::new();
++        for row in &state_rows {
++            referenced.insert(validate_index_row(row, &handoff.script, handoff.role)?);
++        }
++        let mut closure = HashMap::new();
++        for row in &closure_rows {
++            let hash = validate_transaction_row(row)?;
++            closure.insert(hash, row);
++        }
++        if referenced.iter().any(|hash| !closure.contains_key(hash)) {
++            return Err(HandoffError::Invalid("Script index references missing transaction closure".to_owned()));
++        }
++        if state_rows.iter().chain(closure_rows.iter()).any(|row| row.key.first().is_some_and(|p| *p >= KeyPrefix::BlockHash as u8)) {
++            return Err(HandoffError::Invalid("handoff attempts to import chain authority state".to_owned()));
++        }
++
++        let reg_key = registration_key(&handoff.script, handoff.role);
++        let existing_status = self
++            .get_filter_scripts()
++            .into_iter()
++            .find(|ss| ss.script == handoff.script && ss.script_type == handoff.role.script_type());
++        if let Some(status) = existing_status.as_ref() {
++            if status.block_number > handoff.progress.cursor {
++                return Err(HandoffError::Invalid("handoff would regress Script progress".to_owned()));
++            }
++        }
++        for row in state_rows.iter().chain(closure_rows.iter()) {
++            if let Some(existing) = self
++                .get(row.key.clone())
++                .map_err(|e| HandoffError::Storage(e.to_string()))?
++            {
++                if existing != row.value {
++                    return Err(HandoffError::Invalid("destination row conflicts with handoff".to_owned()));
++                }
++            }
++        }
++
++        let mut scripts = self.get_filter_scripts();
++        if let Some(status) = scripts.iter_mut().find(|ss| ss.script == handoff.script && ss.script_type == handoff.role.script_type()) {
++            if status.block_number < handoff.progress.cursor {
++                status.block_number = handoff.progress.cursor;
++            }
++        } else {
++            scripts.push(ScriptStatus {
++                script: handoff.script.clone(),
++                script_type: handoff.role.script_type(),
++                block_number: handoff.progress.cursor,
++            });
++        }
++        let recomputed_min = scripts.iter().map(|ss| ss.block_number).min().unwrap_or_default();
++
++        // Every approved S/H/P write, including the shared global minimum, is
++        // one real backend batch.  No C rows (prefixes 160+) are included.
++        let mut batch = self.batch();
++        for row in state_rows.iter().chain(closure_rows.iter()) {
++            batch.put(&row.key, &row.value);
++        }
++        batch.put(&reg_key, &handoff.progress.cursor.to_be_bytes());
++        batch.put(
++            &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
++            &recomputed_min.to_le_bytes(),
++        );
++        batch.commit().map_err(|e| HandoffError::Storage(e.to_string()))?;
++
++        Ok(ImportOutcome {
++            idempotent: existing_status.is_some(),
++            imported_index_rows: handoff.state.index_rows.len(),
++            imported_transaction_rows: handoff.state.transaction_index_rows.len(),
++            recomputed_min_filtered: recomputed_min,
++        })
++    }
++}
++
++impl<S: LightClientStorage> TypedScriptHandoffStorage for S {}
+diff --git a/light-client-lib/src/tests/rp2_authority_replay.rs b/light-client-lib/src/tests/rp2_authority_replay.rs
+index 03be6cd..5ff8827 100644
+--- a/light-client-lib/src/tests/rp2_authority_replay.rs
++++ b/light-client-lib/src/tests/rp2_authority_replay.rs
+@@ -23,6 +23,7 @@ use crate::{
+         GET_BLOCK_FILTERS_TOKEN,
+     },
+     rp2_observer,
++    rp2_handoff::{DestinationAuthority, HandoffRole, HandoffRow, TypedScriptHandoffStorage},
+     service::{
+         LightClientChainService, ScriptStatus as ServiceScriptStatus,
+         ScriptType as ServiceScriptType, SetScriptsCommand as ServiceSetScriptsCommand,
+@@ -104,6 +105,12 @@ fn script_a() -> Script {
+         .build()
+ }
+ 
++fn script_b() -> Script {
++    Script::new_builder()
++        .code_hash(packed::Byte32::from_slice(&[0x43u8; 32]).unwrap())
++        .build()
++}
++
+ struct Fixture {
+     chain: MockRunningChain,
+     script: Script,
+@@ -231,6 +238,561 @@ fn register_script_through_service(
+     );
+ }
+ 
++fn register_script_at_through_service(
++    chain: &MockRunningChain,
++    peers: Arc<crate::protocols::Peers>,
++    script: &Script,
++    script_type: ServiceScriptType,
++    block_number: BlockNumber,
++) {
++    let pending_txs = Arc::new(std::sync::RwLock::new(PendingTxs::default()));
++    let swc = StorageWithChainData::new(chain.client_storage().clone(), peers, pending_txs);
++    let service = LightClientChainService::new(swc, Arc::new(chain.consensus().clone()));
++    service.set_scripts(
++        vec![ServiceScriptStatus {
++            script: script.clone().into(),
++            script_type,
++            block_number: block_number.into(),
++        }],
++        Some(ServiceSetScriptsCommand::Partial),
++    );
++}
++
++fn service_state_for_role(
++    storage: &Storage,
++    script: &Script,
++    query_script_type: crate::service::ScriptType,
++) -> Value {
++    use crate::service::{LightClientService, Order, SearchKey};
++    let service = LightClientService::new(Arc::new(storage.clone()));
++    let is_lock = matches!(query_script_type, crate::service::ScriptType::Lock);
++    let search = || SearchKey {
++        script: script.clone().into(),
++        script_type: if is_lock {
++            crate::service::ScriptType::Lock
++        } else {
++            crate::service::ScriptType::Type
++        },
++        filter: None,
++        with_data: Some(true),
++        group_by_transaction: None,
++    };
++    let cells = service
++        .get_cells(search(), Order::Asc, 100.into(), None)
++        .expect("get_cells");
++    let mut grouped = search();
++    grouped.group_by_transaction = Some(true);
++    let txs_grouped = service
++        .get_transactions(grouped, Order::Asc, 100.into(), None)
++        .expect("get_transactions grouped");
++    let txs_ungrouped = service
++        .get_transactions(search(), Order::Asc, 100.into(), None)
++        .expect("get_transactions ungrouped");
++    json!({
++        "cells": serde_json::to_value(cells).expect("serialize cells"),
++        "transactions_grouped": serde_json::to_value(txs_grouped).expect("serialize grouped txs"),
++        "transactions_ungrouped": serde_json::to_value(txs_ungrouped).expect("serialize txs"),
++        "script_progress": storage.get_filter_scripts().into_iter()
++            .filter(|ss| ss.script == *script && ss.script_type == StorageScriptType::Lock)
++            .map(|ss| ss.block_number).next(),
++    })
++}
++
++fn service_state(storage: &Storage, script: &Script) -> Value {
++    service_state_for_role(storage, script, crate::service::ScriptType::Lock)
++}
++
++fn chain_authority_fingerprint(storage: &Storage) -> Value {
++    let rows = storage
++        .collect_iterator(
++            IteratorStart::From(Vec::new()),
++            IteratorDirection::Forward,
++            Box::new(|_| true),
++            Box::new(|_key, value| Some(value.to_vec())),
++            usize::MAX,
++        )
++        .into_iter()
++        .filter(|row| {
++            if row.key.first().is_none_or(|prefix| *prefix < 160) {
++                return false;
++            }
++            if row.key.first() == Some(&224) {
++                let meta = &row.key[1..];
++                return meta != b"MIN_FILTERED_NUMBER"
++                    && !meta.starts_with(b"FILTER_SCRIPTS")
++                    && !meta.starts_with(b"MATCHED_BLOCKS");
++            }
++            true
++        })
++        .map(|row| json!({"key": hex(&row.key), "value": hex(&row.value)}))
++        .collect::<Vec<_>>();
++    json!({"authority_rows": rows})
++}
++
++async fn derive_a_for_handoff(
++    case: &str,
++    fixture: &Fixture,
++) -> (EventSession, AuthorityReceipt, crate::rp2_handoff::TypedScriptHandoff, Value) {
++    let _events = start_events(case, "NORMAL_FILTERED", true);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture
++        .chain
++        .create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(
++        &fixture.chain,
++        &mut light_client,
++        &nc,
++        peer_index,
++        fixture.tip_height,
++    )
++    .await;
++    register_script_through_service(&fixture.chain, Arc::clone(&peers), &fixture.script);
++
++    let mut filter = fixture.chain.create_filter_protocol(Arc::clone(&peers));
++    let mut sync = fixture.chain.create_sync_protocol(Arc::clone(&peers));
++    let filter_nc = MockNetworkContext::new(SupportProtocols::Filter);
++    let sync_nc = MockNetworkContext::new(SupportProtocols::Sync);
++    let snapshot = fixture.chain.shared().snapshot();
++    let mut filter_hashes = snapshot
++        .get_block_filter_hashes_until(fixture.tip_height)
++        .expect("fixture filter hashes");
++    filter_hashes.remove(0);
++    peers.mock_latest_block_filter_hashes(peer_index, 0, filter_hashes);
++    filter
++        .notify(filter_nc.context(), GET_BLOCK_FILTERS_TOKEN)
++        .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        1,
++        fixture.a_related_height - 1,
++        fixture.tip_height,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        fixture.a_related_height,
++        fixture.tip_height,
++        fixture.tip_height,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        fixture.a_related_height,
++        fixture.tip_height,
++    )
++    .await;
++    let handoff = fixture
++        .chain
++        .client_storage()
++        .export_typed_script_handoff(
++            fixture.script.clone(),
++            HandoffRole::Lock,
++            fixture.tip_height,
++        )
++        .expect("typed export");
++    let state = service_state(fixture.chain.client_storage(), &fixture.script);
++    rp2_observer::emit(
++        "typed_handoff_exported",
++        json!({
++            "role": "lock",
++            "script_hash": format!("{:#x}", fixture.script.calc_script_hash()),
++            "cursor": handoff.progress.cursor,
++            "handoff_height": handoff.progress.handoff_height,
++            "index_rows": handoff.state.index_rows.len(),
++            "transaction_index_rows": handoff.state.transaction_index_rows.len(),
++            "transaction_closure_rows": handoff.closure.transaction_rows.len(),
++        }),
++        "approved_export_seam",
++    );
++    rp2_observer::emit(
++        "baseline_summary",
++        json!({
++            "backend": BACKEND,
++            "tip_height": fixture.tip_height,
++            "a_related_height": fixture.a_related_height,
++            "authority_height": receipt.height,
++            "script_progress": handoff.progress.cursor,
++            "filter_requests": filter_request_starts(&filter_nc),
++            "unmatched_interval": {"start": 1, "end": fixture.a_related_height - 1},
++        }),
++        "harness",
++    );
++    ( _events, receipt, handoff, state)
++}
++
++fn append_post_h_fixture(fixture: &Fixture) {
++    // Use a mature cellbase (the dev consensus enforces maturity) to create a
++    // new A cell after the handoff boundary.
++    let tx = fixture.chain.get_cellbase_as_input(20);
++    let output = tx
++        .output(0)
++        .expect("post-H cellbase output")
++        .as_builder()
++        .lock(fixture.script.clone())
++        .build();
++    let tx = tx
++        .as_advanced_builder()
++        .set_outputs(vec![output])
++        .build();
++    let proposal = tx.proposal_short_id();
++    fixture.chain.mine_block(|block| {
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + 37)
++            .proposals(vec![proposal.clone()])
++            .build()
++    });
++    fixture.chain.mine_block(|block| {
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + 38)
++            .build()
++    });
++    fixture.chain.mine_block(|block| {
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + 39)
++            .transaction(tx.clone())
++            .build()
++    });
++    fixture.chain.mine_blocks(1);
++}
++
++async fn continue_a_after_h(fixture: &Fixture, handoff_height: BlockNumber) -> Value {
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = fixture
++        .chain
++        .create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let authority = establish_authority(
++        &fixture.chain,
++        &mut light_client,
++        &nc,
++        peer_index,
++        fixture.chain.shared().snapshot().tip_number(),
++    )
++    .await;
++    assert!(authority.height > handoff_height);
++    let mut filter = fixture.chain.create_filter_protocol(Arc::clone(&peers));
++    let mut sync = fixture.chain.create_sync_protocol(Arc::clone(&peers));
++    let filter_nc = MockNetworkContext::new(SupportProtocols::Filter);
++    let sync_nc = MockNetworkContext::new(SupportProtocols::Sync);
++    let tip = fixture.chain.shared().snapshot().tip_number();
++    let mut filter_hashes = fixture
++        .chain
++        .shared()
++        .snapshot()
++        .get_block_filter_hashes_until(tip)
++        .expect("post-H filter hashes");
++    filter_hashes.remove(0);
++    peers.mock_latest_block_filter_hashes(peer_index, 0, filter_hashes);
++    filter.notify(filter_nc.context(), GET_BLOCK_FILTERS_TOKEN).await;
++    let starts = filter_request_starts(&filter_nc);
++    assert!(starts.contains(&(handoff_height + 1)), "post-H scheduler did not start at H+1: {starts:?}");
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        handoff_height + 1,
++        38,
++        tip,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        39,
++        tip,
++        tip,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        39,
++        tip,
++    )
++    .await;
++    json!({
++        "state": service_state(fixture.chain.client_storage(), &fixture.script),
++        "filter_request_starts": starts,
++        "script_progress": fixture.chain.client_storage().get_filter_scripts().into_iter()
++            .find(|ss| ss.script == fixture.script && ss.script_type == StorageScriptType::Lock)
++            .map(|ss| ss.block_number),
++    })
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2b_typed_handoff_core() {
++    setup();
++    let source_fixture = make_fixture();
++    let (_source_events, _source_receipt, handoff, source_state) =
++        derive_a_for_handoff("rp2b-source", &source_fixture).await;
++
++    let baseline_fixture = make_fixture();
++    let (_baseline_events, _baseline_receipt, _baseline_handoff, baseline_state) =
++        derive_a_for_handoff("rp2b-baseline", &baseline_fixture).await;
++    assert_eq!(source_state, baseline_state, "source and independent baseline differ at H");
++
++    let destination_fixture = make_fixture();
++    let _destination_events = start_events("rp2b-import-destination", "GENUINELY_NOT_REQUESTED", true);
++    let peers = destination_fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut light_client = destination_fixture
++        .chain
++        .create_light_client_protocol(Arc::clone(&peers));
++    let authority_nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(
++        &destination_fixture.chain,
++        &mut light_client,
++        &authority_nc,
++        peer_index,
++        destination_fixture.tip_height,
++    )
++    .await;
++    // B is an existing, legitimate registration at the authority boundary;
++    // it remains untouched while A is imported.
++    register_script_at_through_service(
++        &destination_fixture.chain,
++        Arc::clone(&peers),
++        &script_b(),
++        ServiceScriptType::Lock,
++        receipt.height,
++    );
++    // The same packed bytes are also present under the other role.  It is a
++    // destination-owned control registration, not part of the exported A
++    // lock handoff, and it must not acquire A type indexes.
++    register_script_at_through_service(
++        &destination_fixture.chain,
++        Arc::clone(&peers),
++        &handoff.script,
++        ServiceScriptType::Type,
++        receipt.height,
++    );
++    let before_chain = chain_authority_fingerprint(destination_fixture.chain.client_storage());
++    let before_full = authority_fingerprint(destination_fixture.chain.client_storage());
++    record_fingerprint("before_typed_import", &before_full);
++    let authority = DestinationAuthority {
++        genesis_hash: receipt.genesis.clone(),
++        height: receipt.height,
++        hash: receipt.hash.clone(),
++    };
++    let outcome = destination_fixture
++        .chain
++        .client_storage()
++        .import_typed_script_handoff(&handoff, &authority)
++        .expect("valid typed import");
++    let after_chain = chain_authority_fingerprint(destination_fixture.chain.client_storage());
++    let after_full = authority_fingerprint(destination_fixture.chain.client_storage());
++    record_fingerprint("after_typed_import", &after_full);
++    assert_eq!(before_chain, after_chain, "typed import mutated chain authority");
++    rp2_observer::emit(
++        "authority_fingerprint_unchanged",
++        json!({"unchanged": before_chain == after_chain}),
++        "independent_authority_observer",
++    );
++    assert_eq!(
++        destination_fixture.chain.client_storage().get_filter_scripts().len(),
++        3,
++        "unrelated Script registration was replaced"
++    );
++    let imported_state = service_state(destination_fixture.chain.client_storage(), &handoff.script);
++    assert_eq!(baseline_state, imported_state, "query semantics differ immediately after import");
++    let negative_b = service_state(destination_fixture.chain.client_storage(), &script_b());
++    let negative_a_type = service_state_for_role(
++        destination_fixture.chain.client_storage(),
++        &handoff.script,
++        crate::service::ScriptType::Type,
++    );
++    assert_eq!(negative_b["cells"]["objects"].as_array().unwrap().len(), 0);
++    assert_eq!(negative_b["transactions_grouped"]["objects"].as_array().unwrap().len(), 0);
++    assert_eq!(negative_a_type["cells"]["objects"].as_array().unwrap().len(), 0);
++    assert_eq!(negative_a_type["transactions_grouped"]["objects"].as_array().unwrap().len(), 0);
++    assert!(destination_fixture.chain.client_storage().get_filter_scripts().iter().any(|ss| {
++        ss.script == script_b() && ss.script_type == StorageScriptType::Lock && ss.block_number == receipt.height
++    }));
++    assert!(destination_fixture.chain.client_storage().get_filter_scripts().iter().any(|ss| {
++        ss.script == handoff.script && ss.script_type == StorageScriptType::Type && ss.block_number == receipt.height
++    }), "destination A type control registration was lost");
++    assert_eq!(outcome.recomputed_min_filtered, receipt.height);
++    rp2_observer::emit(
++        "import_state_observed",
++        json!({
++            "baseline_equal": baseline_state == imported_state,
++            "query_set": ["get_cells", "get_transactions", "script_status"],
++            "negative_b_script_indexes": destination_fixture.chain.client_storage().get_filter_scripts().iter().filter(|ss| ss.script == script_b()).count(),
++            "negative_a_type_indexes": negative_a_type["cells"]["objects"].as_array().unwrap().len(),
++        }),
++        "independent_query_observer",
++    );
++    rp2_observer::emit(
++        "approved_import_transition",
++        json!({
++            "coverage_start": 1,
++            "coverage_end": receipt.height,
++            "next_filter_start": receipt.height + 1,
++            "cursor": handoff.progress.cursor,
++            "handoff_height": handoff.progress.handoff_height,
++            "handoff_hash": format!("{:#x}", handoff.progress.handoff_hash),
++            "imported_index_rows": outcome.imported_index_rows,
++            "imported_transaction_rows": outcome.imported_transaction_rows,
++        }),
++        "approved_import_seam",
++    );
++    let second = destination_fixture
++        .chain
++        .client_storage()
++        .import_typed_script_handoff(&handoff, &authority)
++        .expect("idempotent typed reimport");
++    assert!(second.idempotent);
++    assert_eq!(before_chain, chain_authority_fingerprint(destination_fixture.chain.client_storage()));
++    let after_first_full = authority_fingerprint(destination_fixture.chain.client_storage());
++    assert_eq!(after_first_full, authority_fingerprint(destination_fixture.chain.client_storage()));
++
++    append_post_h_fixture(&baseline_fixture);
++    append_post_h_fixture(&destination_fixture);
++    let baseline_after = continue_a_after_h(&baseline_fixture, receipt.height).await;
++    let destination_after = continue_a_after_h(&destination_fixture, receipt.height).await;
++    assert_eq!(baseline_after["state"], destination_after["state"], "post-H query states diverged");
++    assert_eq!(baseline_after["script_progress"], destination_after["script_progress"]);
++    assert!(destination_after["filter_request_starts"].as_array().unwrap().contains(&json!(receipt.height + 1)));
++    rp2_observer::emit(
++        "continuation_summary",
++        json!({"baseline_equal": baseline_after == destination_after, "baseline": baseline_after, "destination": destination_after}),
++        "normal_filter_scheduler",
++    );
++    write_result(
++        "rp2b-core",
++        json!({
++            "backend": BACKEND,
++            "handoff_height": receipt.height,
++            "handoff_hash": format!("{:#x}", receipt.hash),
++            "source_equals_baseline_at_h": source_state == baseline_state,
++            "import": {
++                "idempotent_reimport": second.idempotent,
++                "imported_index_rows": outcome.imported_index_rows,
++                "imported_transaction_rows": outcome.imported_transaction_rows,
++                "recomputed_min_filtered": outcome.recomputed_min_filtered,
++            },
++            "destination_equals_baseline_at_h": baseline_state == imported_state,
++            "post_h_converged": baseline_after == destination_after,
++            "destination_request_starts": destination_after["filter_request_starts"],
++            "authority_chain_unchanged": before_chain == after_chain,
++            "unrelated_script_preserved": true,
++        }),
++    );
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2b_real_import_adversaries_reject_closed() {
++    setup();
++    let source_fixture = make_fixture();
++    let (_source_events, _source_receipt, valid_handoff, _source_state) =
++        derive_a_for_handoff("rp2b-adversary-source", &source_fixture).await;
++    let fixture = make_fixture();
++    let _events = start_events("rp2b-import-adversarial", "AUTHORITY_INVALID", true);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut protocol = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut protocol, &nc, peer_index, fixture.tip_height).await;
++    let before = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("before_real_import_adversaries", &before);
++    let authority = DestinationAuthority {
++        genesis_hash: receipt.genesis.clone(),
++        height: receipt.height,
++        hash: receipt.hash.clone(),
++    };
++    let mut cases: Vec<(&str, crate::rp2_handoff::TypedScriptHandoff)> = Vec::new();
++    let mut wrong_hash = valid_handoff.clone();
++    wrong_hash.progress.handoff_hash = packed::Byte32::from_slice(&[1u8; 32]).unwrap();
++    cases.push(("wrong_handoff_hash", wrong_hash));
++    let mut wrong_genesis = valid_handoff.clone();
++    wrong_genesis.progress.genesis_hash = packed::Byte32::from_slice(&[2u8; 32]).unwrap();
++    cases.push(("wrong_genesis", wrong_genesis));
++    let mut wrong_script = valid_handoff.clone();
++    wrong_script.script = script_b();
++    cases.push(("wrong_script", wrong_script));
++    let mut wrong_role = valid_handoff.clone();
++    wrong_role.role = HandoffRole::Type;
++    cases.push(("wrong_role", wrong_role));
++    let mut beyond = valid_handoff.clone();
++    beyond.progress.cursor = receipt.height + 1;
++    cases.push(("cursor_beyond_verified", beyond));
++    let mut stale_version = valid_handoff.clone();
++    stale_version.format_version = 99;
++    cases.push(("stale_format", stale_version));
++    let mut forged_c = valid_handoff.clone();
++    forged_c.closure.transaction_rows.push(HandoffRow { key: vec![160u8; 33], value: vec![] });
++    cases.push(("forged_chain_closure", forged_c));
++    for (name, claim) in cases {
++        let result = fixture
++            .chain
++            .client_storage()
++            .import_typed_script_handoff(&claim, &authority);
++        assert!(result.is_err(), "malicious handoff unexpectedly accepted: {name}");
++        let reason = result.err().map(|e| e.to_string()).unwrap_or_else(|| "accepted".to_owned());
++        rp2_observer::emit(
++            "handoff_validation_rejected",
++            json!({"case": name, "reason": reason}),
++            "approved_validation",
++        );
++    }
++    let after = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("after_real_import_adversaries", &after);
++    assert_eq!(before, after, "rejected imports changed destination authority/state");
++    assert!(fixture.chain.client_storage().get_filter_scripts().is_empty());
++    rp2_observer::emit("authority_fingerprint_unchanged", json!({"unchanged": true}), "independent_authority_observer");
++    write_result(
++        "rp2b-adversarial",
++        json!({
++            "backend": BACKEND,
++            "rejected_cases": [
++                "wrong_handoff_hash",
++                "wrong_genesis",
++                "wrong_script",
++                "wrong_role",
++                "cursor_beyond_verified",
++                "stale_format",
++                "forged_chain_closure",
++            ],
++            "authority_unchanged": before == after,
++            "destination_scripts_empty": fixture.chain.client_storage().get_filter_scripts().is_empty(),
++        }),
++    );
++}
++
+ async fn establish_authority(
+     chain: &MockRunningChain,
+     protocol: &mut LightClientProtocol,

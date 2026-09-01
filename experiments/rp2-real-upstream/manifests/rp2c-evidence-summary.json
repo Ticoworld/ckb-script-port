@@ -1,0 +1,1614 @@
+{
+    "schema_version":  1,
+    "experiment":  "D2-RP2C-cross-backend-semantic-portability",
+    "captured_utc":  "2026-09-01T04:37:49.7906403Z",
+    "project_commit":  "f0117229a6cb684c76bb46b32a40b80ae7c39ff4",
+    "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+    "artifact_version":  "rp2-cross-backend-fixture-v1",
+    "builds":  {
+                   "schema_version":  1,
+                   "experiment":  "D2-RP2C-cross-backend-semantic-portability",
+                   "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+                   "cargo_lock_sha256":  "F3A18D999A89519024B44B702C1637C571217CEB8D06CD7E39126E8D22EAE890",
+                   "rustc":  "rustc 1.96.0 (ac68faa20 2026-05-25)",
+                   "cargo":  "cargo 1.96.0 (30a34c682 2026-05-25)",
+                   "builds":  [
+                                  {
+                                      "backend":  "rocksdb",
+                                      "target_dir":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\rocksdb",
+                                      "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker --no-run --locked",
+                                      "started_utc":  "2026-09-01T04:36:29.0320321Z",
+                                      "completed_utc":  "2026-09-01T04:36:31.3015928Z",
+                                      "artifacts":  [
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\rocksdb\\debug\\deps\\ckb_light_client_lib-3a1f157827394d94.exe",
+                                                            "sha256":  "35167E3D7E49104725BF42D55DE911CF097EE7040D42825BD83C82F96B843A31",
+                                                            "bytes":  556622848
+                                                        },
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\rocksdb\\debug\\deps\\ckb_light_client_lib.dll",
+                                                            "sha256":  "F70A8A67CBB12E2CB1D6224361DB486251CAF8552CBC031F62EA89963ED9EFE4",
+                                                            "bytes":  308056576
+                                                        },
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\rocksdb\\debug\\deps\\libckb_light_client_lib.rlib",
+                                                            "sha256":  "D43E0F71DC54410DB81FEA4EC3717A7A7DB041F2272E3BA1F35B65BEDE98F24A",
+                                                            "bytes":  41298254
+                                                        }
+                                                    ]
+                                  },
+                                  {
+                                      "backend":  "sqlite",
+                                      "target_dir":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\sqlite",
+                                      "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker --no-run --locked",
+                                      "started_utc":  "2026-09-01T04:36:31.3035964Z",
+                                      "completed_utc":  "2026-09-01T04:36:33.2000133Z",
+                                      "artifacts":  [
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\sqlite\\debug\\deps\\ckb_light_client_lib-659deef4d0f22f1b.exe",
+                                                            "sha256":  "124761C7157BA262C0B97EEDD6358D1D2F2507E8004040574C0CFBAA40765E71",
+                                                            "bytes":  562122240
+                                                        },
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\sqlite\\debug\\deps\\ckb_light_client_lib.dll",
+                                                            "sha256":  "B127C75CCC4CE53CEFF6CFB705AF93436C24B84D31FB87BF9F9997F5064B535B",
+                                                            "bytes":  164716032
+                                                        },
+                                                        {
+                                                            "path":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\_work\\build\\sqlite\\debug\\deps\\libckb_light_client_lib.rlib",
+                                                            "sha256":  "80C22FE90F97E513CCF6D75C4574BBBFE8E253AD469CEA6F72D84D9E944BAEEC",
+                                                            "bytes":  42215754
+                                                        }
+                                                    ]
+                                  }
+                              ]
+               },
+    "accepted_patch_sha256":  {
+                                  "0002-rp2b-typed-script-handoff.patch":  "D811E5F6E1941A262884DFE2D2C2013216D8BCFB22AB3AD05B30D5AAD08C4F5F",
+                                  "0003-rp2b-spendable-fixture.patch":  "23C933F7FBC7969A136D467279D1EFBED222566DD51C879613ABC70974591607",
+                                  "0004-rp2c-cross-backend-transport.patch":  "8C0B8F9D60CE54647B9C99E372E2B51E833CEF1B57AF4C2B0F789316941EDDC7"
+                              },
+    "cases":  {
+                  "C1":  {
+                             "schema_version":  1,
+                             "experiment":  "D2-RP2C",
+                             "case":  "c1-rocksdb-to-sqlite",
+                             "source_backend":  "rocksdb",
+                             "destination_backend":  "sqlite",
+                             "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+                             "artifact_version":  "rp2-cross-backend-fixture-v1",
+                             "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                             "script_hash":  "0x8a5203dcaa35d0b43c7675af74ff4029d4197a5540fd1f15cfa83ba3a574b9c8",
+                             "role":  "lock",
+                             "handoff_height":  36,
+                             "handoff_hash":  "0x0c75246f78f2ed60addf83fed18856de55deac420509f2766540ab01a35458b5",
+                             "genesis_hash":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                             "checks":  {
+                                            "source_backend_distinct_from_destination":  true,
+                                            "artifact_version":  true,
+                                            "artifact_digest_matches_tampered_backend":  true,
+                                            "tampered_backend_metadata_does_not_change_semantics":  true,
+                                            "authority_unchanged_during_import":  true,
+                                            "query_equivalent_at_h":  true,
+                                            "query_equivalent_after":  true,
+                                            "progress_equivalent_at_h":  true,
+                                            "progress_equivalent_after":  true,
+                                            "pre_h_spent_a0":  true,
+                                            "handoff_live_a1":  true,
+                                            "post_h_spent_a1":  true,
+                                            "post_h_live_a2":  true,
+                                            "zero_replay_through_h":  true,
+                                            "baseline_normal_history":  true,
+                                            "ordinary_post_h_continuation":  true,
+                                            "idempotent_reimport":  true,
+                                            "unrelated_script_preserved":  true,
+                                            "global_min_recomputed_locally":  true,
+                                            "lifecycle_converges":  true
+                                        },
+                             "query_equivalent_at_h":  true,
+                             "query_equivalent_after":  true,
+                             "progress_equivalent":  true,
+                             "authority_unchanged_during_import":  true,
+                             "zero_replay_through_h_preserved":  true,
+                             "baseline_filter_request_starts":  [
+                                                                    37
+                                                                ],
+                             "import_filter_request_starts":  [
+                                                                  37
+                                                              ],
+                             "baseline_progress_at_h":  36,
+                             "import_progress_at_h":  36,
+                             "baseline_progress_after":  40,
+                             "import_progress_after":  40,
+                             "pre_h_spent_outpoint":  "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+                             "handoff_live_outpoint":  "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+                             "post_h_spent_outpoint":  "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+                             "replacement_live_outpoint":  "0x7777171e70c79d8583b3f0d0c43ad519b7c6e7680ac193e8e9effa4ce78ae25a00000000",
+                             "imported_s_count":  1,
+                             "imported_h_count":  3,
+                             "imported_categories":  {
+                                                         "S":  [
+                                                                   "script-index",
+                                                                   "transaction-index"
+                                                               ],
+                                                         "H":  [
+                                                                   "TxHash transaction closure"
+                                                               ]
+                                                     },
+                             "recomputed_min_filtered":  36,
+                             "idempotent_reimport":  true,
+                             "unrelated_script_preserved":  true,
+                             "source_process_id":  "c1-rocksdb-to-sqlite-source-rocksdb",
+                             "destination_process_id":  "c1-rocksdb-to-sqlite-import-sqlite",
+                             "tampered_backend_metadata_accepted_semantically":  true
+                         },
+                  "C2":  {
+                             "schema_version":  1,
+                             "experiment":  "D2-RP2C",
+                             "case":  "c2-sqlite-to-rocksdb",
+                             "source_backend":  "sqlite",
+                             "destination_backend":  "rocksdb",
+                             "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+                             "artifact_version":  "rp2-cross-backend-fixture-v1",
+                             "artifact_digest":  "0xc9b3d3387b9f4cf8c7680edb9d672bec30449d5553808d82f93d55158d509544",
+                             "script_hash":  "0x8a5203dcaa35d0b43c7675af74ff4029d4197a5540fd1f15cfa83ba3a574b9c8",
+                             "role":  "lock",
+                             "handoff_height":  36,
+                             "handoff_hash":  "0x0c75246f78f2ed60addf83fed18856de55deac420509f2766540ab01a35458b5",
+                             "genesis_hash":  "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+                             "checks":  {
+                                            "source_backend_distinct_from_destination":  true,
+                                            "artifact_version":  true,
+                                            "artifact_digest_matches_tampered_backend":  true,
+                                            "tampered_backend_metadata_does_not_change_semantics":  true,
+                                            "authority_unchanged_during_import":  true,
+                                            "query_equivalent_at_h":  true,
+                                            "query_equivalent_after":  true,
+                                            "progress_equivalent_at_h":  true,
+                                            "progress_equivalent_after":  true,
+                                            "pre_h_spent_a0":  true,
+                                            "handoff_live_a1":  true,
+                                            "post_h_spent_a1":  true,
+                                            "post_h_live_a2":  true,
+                                            "zero_replay_through_h":  true,
+                                            "baseline_normal_history":  true,
+                                            "ordinary_post_h_continuation":  true,
+                                            "idempotent_reimport":  true,
+                                            "unrelated_script_preserved":  true,
+                                            "global_min_recomputed_locally":  true,
+                                            "lifecycle_converges":  true
+                                        },
+                             "query_equivalent_at_h":  true,
+                             "query_equivalent_after":  true,
+                             "progress_equivalent":  true,
+                             "authority_unchanged_during_import":  true,
+                             "zero_replay_through_h_preserved":  true,
+                             "baseline_filter_request_starts":  [
+                                                                    37
+                                                                ],
+                             "import_filter_request_starts":  [
+                                                                  37
+                                                              ],
+                             "baseline_progress_at_h":  36,
+                             "import_progress_at_h":  36,
+                             "baseline_progress_after":  40,
+                             "import_progress_after":  40,
+                             "pre_h_spent_outpoint":  "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+                             "handoff_live_outpoint":  "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+                             "post_h_spent_outpoint":  "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+                             "replacement_live_outpoint":  "0x7777171e70c79d8583b3f0d0c43ad519b7c6e7680ac193e8e9effa4ce78ae25a00000000",
+                             "imported_s_count":  1,
+                             "imported_h_count":  3,
+                             "imported_categories":  {
+                                                         "S":  [
+                                                                   "script-index",
+                                                                   "transaction-index"
+                                                               ],
+                                                         "H":  [
+                                                                   "TxHash transaction closure"
+                                                               ]
+                                                     },
+                             "recomputed_min_filtered":  36,
+                             "idempotent_reimport":  true,
+                             "unrelated_script_preserved":  true,
+                             "source_process_id":  "c2-sqlite-to-rocksdb-source-sqlite",
+                             "destination_process_id":  "c2-sqlite-to-rocksdb-import-rocksdb",
+                             "tampered_backend_metadata_accepted_semantically":  true
+                         }
+              },
+    "verifier":  {
+                     "schema_version":  1,
+                     "files":  [
+                                   {
+                                       "classification":  "NORMAL_FILTERED",
+                                       "expected_classification":  "NORMAL_FILTERED",
+                                       "case":  "c1-rocksdb-to-sqlite-source",
+                                       "event_count":  36,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  30,
+                                                                   "end":  30,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  1,
+                                                                   "end":  31,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  5,
+                                                                   "end":  36,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               }
+                                                           ],
+                                       "filter_block_count":  3,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  false,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c1-rocksdb-to-sqlite-source.jsonl"
+                                   },
+                                   {
+                                       "classification":  "NORMAL_FILTERED",
+                                       "expected_classification":  "NORMAL_FILTERED",
+                                       "case":  "c2-sqlite-to-rocksdb-baseline",
+                                       "event_count":  54,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  30,
+                                                                   "end":  30,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  1,
+                                                                   "end":  31,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  5,
+                                                                   "end":  36,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  4,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  false,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-baseline.jsonl"
+                                   },
+                                   {
+                                       "classification":  "GENUINELY_NOT_REQUESTED",
+                                       "expected_classification":  "GENUINELY_NOT_REQUESTED",
+                                       "case":  "c2-sqlite-to-rocksdb-import-tampered-backend",
+                                       "event_count":  34,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  1,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-import-tampered-backend.jsonl"
+                                   },
+                                   {
+                                       "classification":  "GENUINELY_NOT_REQUESTED",
+                                       "expected_classification":  "GENUINELY_NOT_REQUESTED",
+                                       "case":  "c2-sqlite-to-rocksdb-import",
+                                       "event_count":  34,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  1,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-import.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-cursor-beyond",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-cursor-beyond.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-digest-mismatch",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-digest-mismatch.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-duplicate-item",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-duplicate-item.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-forged-c-state",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-forged-c-state.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-reordered",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-reordered.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-truncated",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-truncated.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-genesis",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-wrong-genesis.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-handoff-hash",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-wrong-handoff-hash.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-role",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-wrong-role.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-script",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-wrong-script.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-version",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "rocksdb-c2-sqlite-to-rocksdb-negative-wrong-version.jsonl"
+                                   },
+                                   {
+                                       "classification":  "NORMAL_FILTERED",
+                                       "expected_classification":  "NORMAL_FILTERED",
+                                       "case":  "c1-rocksdb-to-sqlite-baseline",
+                                       "event_count":  54,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  30,
+                                                                   "end":  30,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  1,
+                                                                   "end":  31,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  5,
+                                                                   "end":  36,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  4,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  false,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-baseline.jsonl"
+                                   },
+                                   {
+                                       "classification":  "GENUINELY_NOT_REQUESTED",
+                                       "expected_classification":  "GENUINELY_NOT_REQUESTED",
+                                       "case":  "c1-rocksdb-to-sqlite-import-tampered-backend",
+                                       "event_count":  34,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  1,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-import-tampered-backend.jsonl"
+                                   },
+                                   {
+                                       "classification":  "GENUINELY_NOT_REQUESTED",
+                                       "expected_classification":  "GENUINELY_NOT_REQUESTED",
+                                       "case":  "c1-rocksdb-to-sqlite-import",
+                                       "event_count":  34,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  38,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  37
+                                                               },
+                                                               {
+                                                                   "count":  2,
+                                                                   "end":  40,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  39
+                                                               }
+                                                           ],
+                                       "filter_block_count":  1,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-import.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-cursor-beyond",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-cursor-beyond.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-digest-mismatch",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-digest-mismatch.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-duplicate-item",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-duplicate-item.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-forged-c-state",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-forged-c-state.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-reordered",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-reordered.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-truncated",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-truncated.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-genesis",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-wrong-genesis.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-handoff-hash",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-wrong-handoff-hash.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-role",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-wrong-role.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-script",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-wrong-script.jsonl"
+                                   },
+                                   {
+                                       "classification":  "AUTHORITY_INVALID",
+                                       "expected_classification":  "AUTHORITY_INVALID",
+                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-version",
+                                       "event_count":  6,
+                                       "filter_requests":  [
+
+                                                           ],
+                                       "accepted_ranges":  [
+
+                                                           ],
+                                       "filter_block_count":  0,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  true,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c1-rocksdb-to-sqlite-negative-wrong-version.jsonl"
+                                   },
+                                   {
+                                       "classification":  "NORMAL_FILTERED",
+                                       "expected_classification":  "NORMAL_FILTERED",
+                                       "case":  "c2-sqlite-to-rocksdb-source",
+                                       "event_count":  36,
+                                       "filter_requests":  [
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  null,
+                                                                   "end":  null,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               }
+                                                           ],
+                                       "accepted_ranges":  [
+                                                               {
+                                                                   "count":  30,
+                                                                   "end":  30,
+                                                                   "match_count":  0,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  1
+                                                               },
+                                                               {
+                                                                   "count":  1,
+                                                                   "end":  31,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  31
+                                                               },
+                                                               {
+                                                                   "count":  5,
+                                                                   "end":  36,
+                                                                   "match_count":  1,
+                                                                   "peer":  "SessionId(1)",
+                                                                   "start":  32
+                                                               }
+                                                           ],
+                                       "filter_block_count":  3,
+                                       "authority_accepted":  true,
+                                       "authority_fingerprint_unchanged":  false,
+                                       "errors":  [
+
+                                                  ],
+                                       "file":  "sqlite-c2-sqlite-to-rocksdb-source.jsonl"
+                                   }
+                               ],
+                     "passed":  true,
+                     "failures":  [
+
+                                  ]
+                 },
+    "processes":  [
+                      {
+                          "value":  [
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-source-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "export",
+                                            "case":  "c1-rocksdb-to-sqlite-source",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:33.2150124Z",
+                                            "completed_utc":  "2026-09-01T04:36:35.8202694Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-source-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-source.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-baseline-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "baseline",
+                                            "case":  "c1-rocksdb-to-sqlite-baseline",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:35.8262706Z",
+                                            "completed_utc":  "2026-09-01T04:36:38.4602493Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-baseline-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-baseline.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-import-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "import",
+                                            "case":  "c1-rocksdb-to-sqlite-import",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:38.4612397Z",
+                                            "completed_utc":  "2026-09-01T04:36:40.8806195Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-import-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-import.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-import-tampered-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "import",
+                                            "case":  "c1-rocksdb-to-sqlite-import-tampered-backend",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:40.8816285Z",
+                                            "completed_utc":  "2026-09-01T04:36:43.6437031Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-import-tampered-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-import-tampered-backend.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-truncated-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-truncated",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:43.8634468Z",
+                                            "completed_utc":  "2026-09-01T04:36:46.3838560Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-truncated-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-truncated.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-digest-mismatch-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-digest-mismatch",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:46.3848548Z",
+                                            "completed_utc":  "2026-09-01T04:36:48.8098270Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-digest-mismatch-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-digest-mismatch.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-duplicate-item-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-duplicate-item",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:48.8108287Z",
+                                            "completed_utc":  "2026-09-01T04:36:51.6263211Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-duplicate-item-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-duplicate-item.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-wrong-version-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-wrong-version",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:51.6293208Z",
+                                            "completed_utc":  "2026-09-01T04:36:54.1674144Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-wrong-version-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-wrong-version.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-reordered-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-reordered",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:54.1674144Z",
+                                            "completed_utc":  "2026-09-01T04:36:56.4554155Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-reordered-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-reordered.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-wrong-genesis-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-wrong-genesis",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:56.4564155Z",
+                                            "completed_utc":  "2026-09-01T04:36:58.7041279Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-wrong-genesis-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-wrong-genesis.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-wrong-handoff-hash-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-wrong-handoff-hash",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:36:58.7051275Z",
+                                            "completed_utc":  "2026-09-01T04:37:01.3914248Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-wrong-handoff-hash-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-wrong-handoff-hash.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-wrong-script-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-wrong-script",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:01.3924238Z",
+                                            "completed_utc":  "2026-09-01T04:37:03.8392504Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-wrong-script-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-wrong-script.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-wrong-role-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-wrong-role",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:03.8402484Z",
+                                            "completed_utc":  "2026-09-01T04:37:06.3848001Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-wrong-role-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-wrong-role.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-cursor-beyond-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-cursor-beyond",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:06.3858020Z",
+                                            "completed_utc":  "2026-09-01T04:37:08.8472681Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-cursor-beyond-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-cursor-beyond.json"
+                                        },
+                                        {
+                                            "process_id":  "c1-rocksdb-to-sqlite-negative-forged-c-state-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "negative",
+                                            "case":  "c1-rocksdb-to-sqlite-negative-forged-c-state",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:08.8482676Z",
+                                            "completed_utc":  "2026-09-01T04:37:11.6481849Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c1-rocksdb-to-sqlite-negative-forged-c-state-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c1-rocksdb-to-sqlite-negative-forged-c-state.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-source-sqlite",
+                                            "backend":  "sqlite",
+                                            "mode":  "export",
+                                            "case":  "c2-sqlite-to-rocksdb-source",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:11.6501865Z",
+                                            "completed_utc":  "2026-09-01T04:37:14.0857415Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-source-sqlite.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-source.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-baseline-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "baseline",
+                                            "case":  "c2-sqlite-to-rocksdb-baseline",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:14.0867413Z",
+                                            "completed_utc":  "2026-09-01T04:37:16.7038302Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-baseline-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-baseline.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-import-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "import",
+                                            "case":  "c2-sqlite-to-rocksdb-import",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:16.7048274Z",
+                                            "completed_utc":  "2026-09-01T04:37:19.4344157Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-import-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-import.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-import-tampered-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "import",
+                                            "case":  "c2-sqlite-to-rocksdb-import-tampered-backend",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:19.4354164Z",
+                                            "completed_utc":  "2026-09-01T04:37:22.0641425Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-import-tampered-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-import-tampered-backend.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-truncated-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-truncated",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:22.2519024Z",
+                                            "completed_utc":  "2026-09-01T04:37:24.7608517Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-truncated-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-truncated.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-digest-mismatch-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-digest-mismatch",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:24.7618498Z",
+                                            "completed_utc":  "2026-09-01T04:37:27.3683533Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-digest-mismatch-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-digest-mismatch.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-duplicate-item-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-duplicate-item",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:27.3693519Z",
+                                            "completed_utc":  "2026-09-01T04:37:30.0438505Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-duplicate-item-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-duplicate-item.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-wrong-version-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-wrong-version",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:30.0448573Z",
+                                            "completed_utc":  "2026-09-01T04:37:32.5467491Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-wrong-version-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-wrong-version.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-reordered-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-reordered",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:32.5477507Z",
+                                            "completed_utc":  "2026-09-01T04:37:35.1146744Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-reordered-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-reordered.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-wrong-genesis-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-wrong-genesis",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:35.1168480Z",
+                                            "completed_utc":  "2026-09-01T04:37:37.4930850Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-wrong-genesis-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-wrong-genesis.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-wrong-handoff-hash-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-wrong-handoff-hash",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:37.4940835Z",
+                                            "completed_utc":  "2026-09-01T04:37:39.8363925Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-wrong-handoff-hash-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-wrong-handoff-hash.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-wrong-script-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-wrong-script",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:39.8373942Z",
+                                            "completed_utc":  "2026-09-01T04:37:42.1632211Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-wrong-script-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-wrong-script.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-wrong-role-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-wrong-role",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:42.1655978Z",
+                                            "completed_utc":  "2026-09-01T04:37:44.5056780Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-wrong-role-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-wrong-role.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-cursor-beyond-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-cursor-beyond",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:44.5066862Z",
+                                            "completed_utc":  "2026-09-01T04:37:46.9421810Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-cursor-beyond-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-cursor-beyond.json"
+                                        },
+                                        {
+                                            "process_id":  "c2-sqlite-to-rocksdb-negative-forged-c-state-rocksdb",
+                                            "backend":  "rocksdb",
+                                            "mode":  "negative",
+                                            "case":  "c2-sqlite-to-rocksdb-negative-forged-c-state",
+                                            "command":  "cargo test --manifest-path light-client-lib/Cargo.toml rp2c_cross_backend_worker -- --test-threads=1 --nocapture",
+                                            "started_utc":  "2026-09-01T04:37:46.9431811Z",
+                                            "completed_utc":  "2026-09-01T04:37:49.4098895Z",
+                                            "log":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\process-logs\\c2-sqlite-to-rocksdb-negative-forged-c-state-rocksdb.log",
+                                            "output":  "C:\\Users\\timot\\Desktop\\2026\\CKB\\ckb-script-port\\experiments\\rp2-real-upstream\\run-rp2c\\results\\c2-sqlite-to-rocksdb-negative-forged-c-state.json"
+                                        }
+                                    ],
+                          "Count":  30
+                      }
+                  ],
+    "cross_backend_adversaries":  {
+                                      "c1-rocksdb-to-sqlite":  [
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-truncated",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "invalid artifact envelope: EOF while parsing a string at line 1 column 2714",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-digest-mismatch",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "artifact payload digest mismatch",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-duplicate-item",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "index rows are not strictly canonical",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-version",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "unknown experimental artifact version",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-reordered",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "transaction-index rows are not strictly canonical",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-genesis",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-handoff-hash",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-script",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-wrong-role",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-cursor-beyond",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c1-rocksdb-to-sqlite-negative-forged-c-state",
+                                                                       "backend":  "sqlite",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   }
+                                                               ],
+                                      "c2-sqlite-to-rocksdb":  [
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-truncated",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "invalid artifact envelope: EOF while parsing a string at line 1 column 2713",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-digest-mismatch",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "artifact payload digest mismatch",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-duplicate-item",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "index rows are not strictly canonical",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-version",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "unknown experimental artifact version",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-reordered",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "transaction-index rows are not strictly canonical",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-genesis",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-handoff-hash",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-script",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-wrong-role",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-cursor-beyond",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   },
+                                                                   {
+                                                                       "case":  "c2-sqlite-to-rocksdb-negative-forged-c-state",
+                                                                       "backend":  "rocksdb",
+                                                                       "rejected":  true,
+                                                                       "reason":  "handoff import requires an exclusive offline destination",
+                                                                       "authority_unchanged":  true,
+                                                                       "destination_scripts_empty":  true
+                                                                   }
+                                                               ]
+                                  },
+    "verdict":  "RP2-C PASS — PROCEED TO RP2-D REORG + CRASH"
+}

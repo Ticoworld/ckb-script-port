@@ -4,6 +4,8 @@ target/
 
 # RP2 run state and generated local databases
 experiments/rp2-real-upstream/run/
+experiments/rp2-real-upstream/run-rp2c/
+experiments/rp2-real-upstream/run-rp2d*/
 experiments/rp2-real-upstream/target/
 experiments/rp2-real-upstream/**/*.db
 experiments/rp2-real-upstream/**/*.sqlite

@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "experiment": "D2-RP2B-R1",
+  "captured_utc": "2026-08-31T02:25:07Z",
+  "fixture_state": "unchanged pre-repair synthetic A lock",
+  "upstream_revision": "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+  "rp2a": {
+    "rocksdb": {"passed": 7, "failed": 0, "verifier": "passed"},
+    "sqlite": {"passed": 7, "failed": 0, "verifier": "passed"}
+  },
+  "rp2b": {
+    "rocksdb": {"core_passed": 1, "adversarial_rejections": 7, "verifier": "passed"},
+    "sqlite": {"core_passed": 1, "adversarial_rejections": 7, "verifier": "passed"}
+  },
+  "handoff": {
+    "genesis_hash": "0x50be56a206c3e8bc6ca3e4feb92bca834e3ac1c33ecb7bb3a7715f048f822337",
+    "script_code_hash": "0x4242424242424242424242424242424242424242424242424242424242424242",
+    "script_role": "lock",
+    "height": 36,
+    "hash": "0xcaa9f7e215701f8fe1af1a52a3c8be4ff53ad0911c853399998a1c0c1eb7e586"
+  },
+  "original_blocker": {
+    "classification": "no executable lock code / missing cell dependency",
+    "spend_error": "ScriptNotFound at Inputs[0].Lock for code_hash 0x4242...4242",
+    "creation_fixture_error": "args-only canonical trial also produced InvalidDAO because hand-built block DAO was not recomputed"
+  },
+  "scope": "pre-repair evidence only; does not claim spent-cell lifecycle"
+}

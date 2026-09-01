@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "experiment": "D2-RP2D",
+  "captured_utc": "2026-08-31T07:42:36.0216883Z",
+  "project_commit": "f0117229a6cb684c76bb46b32a40b80ae7c39ff4",
+  "project_status": "expected RP2 experiment artifacts uncommitted; no unrelated files",
+  "upstream_revision": "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+  "cargo_lock_sha256": "F3A18D999A89519024B44B702C1637C571217CEB8D06CD7E39126E8D22EAE890",
+  "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+  "cargo": "cargo 1.96.0 (30a34c682 2026-05-25)",
+  "accepted_patch_sha256": {
+    "0002-rp2b-typed-script-handoff.patch": "D811E5F6E1941A262884DFE2D2C2013216D8BCFB22AB3AD05B30D5AAD08C4F5F",
+    "0003-rp2b-spendable-fixture.patch": "23C933F7FBC7969A136D467279D1EFBED222566DD51C879613ABC70974591607",
+    "0004-rp2c-cross-backend-transport.patch": "8C0B8F9D60CE54647B9C99E372E2B51E833CEF1B57AF4C2B0F789316941EDDC7"
+  },
+  "accepted_gate_rerun": "pending RP2-A/RP2-B/RP2-C rerun",
+  "scope": "starting checkpoint before RP2-D reorg/crash changes"
+}

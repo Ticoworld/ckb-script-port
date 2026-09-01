@@ -1,0 +1,728 @@
+diff --git a/light-client-lib/src/tests/rp2_authority_replay.rs b/light-client-lib/src/tests/rp2_authority_replay.rs
+index 5ff8827..c40844c 100644
+--- a/light-client-lib/src/tests/rp2_authority_replay.rs
++++ b/light-client-lib/src/tests/rp2_authority_replay.rs
+@@ -11,7 +11,7 @@ use ckb_network::{CKBProtocolHandler, PeerIndex, SupportProtocols};
+ use ckb_store::ChainStore;
+ use ckb_types::{
+     bytes::Bytes,
+-    core::{BlockNumber, BlockView, ScriptHashType},
++    core::{BlockNumber, BlockView, ScriptHashType, TransactionView},
+     packed::{self, Script},
+     prelude::*,
+ };
+@@ -36,7 +36,7 @@ use crate::{
+     tests::{
+         prelude::*,
+         utils::{setup, MockChain, MockNetworkContext, MockRunningChain},
+-        ALWAYS_SUCCESS_SCRIPT,
++        ALWAYS_SUCCESS_BIN, ALWAYS_SUCCESS_SCRIPT,
+     },
+ };
+ 
+@@ -100,8 +100,10 @@ fn hex(bytes: &[u8]) -> String {
+ }
+ 
+ fn script_a() -> Script {
++    let mut binary = ALWAYS_SUCCESS_BIN.to_vec();
++    binary[0xdc] ^= 1;
+     Script::new_builder()
+-        .code_hash(packed::Byte32::from_slice(&[0x42u8; 32]).unwrap())
++        .code_hash(packed::CellOutput::calc_data_hash(&binary))
+         .build()
+ }
+ 
+@@ -115,9 +117,42 @@ struct Fixture {
+     chain: MockRunningChain,
+     script: Script,
+     a_related_height: BlockNumber,
++    a_created_height: BlockNumber,
++    a_spent_height: BlockNumber,
++    a0_outpoint: packed::OutPoint,
++    a1_outpoint: packed::OutPoint,
++    a1_capacity: ckb_types::core::Capacity,
+     tip_height: BlockNumber,
+ }
+ 
++fn spendable_cell_dep(chain: &MockRunningChain) -> packed::CellDep {
++    let script = script_a();
++    chain
++        .shared()
++        .snapshot()
++        .get_block_by_number(0)
++        .unwrap()
++        .transactions()
++        .into_iter()
++        .filter_map(|tx| {
++            tx.outputs_data()
++                .into_iter()
++                .enumerate()
++                .find(|(_, data)| {
++                    packed::CellOutput::calc_data_hash(&data.raw_data()) == script.code_hash()
++                })
++                .map(|(idx, _)| {
++                    let out_point = packed::OutPoint::new_builder()
++                        .tx_hash(tx.hash())
++                        .index(idx as u32)
++                        .build();
++                    packed::CellDep::new_builder().out_point(out_point).build()
++                })
++        })
++        .next()
++        .expect("spendable always-success cell dep")
++}
++
+ fn deterministic_timestamped_block(block: packed::Block) -> BlockView {
+     let number: u64 = block.header().raw().number().unpack();
+     block
+@@ -130,6 +165,10 @@ fn write_fixture_manifest(
+     chain: &MockRunningChain,
+     script: &Script,
+     a_related_height: BlockNumber,
++    a_created_height: BlockNumber,
++    a_spent_height: BlockNumber,
++    a0_outpoint: &packed::OutPoint,
++    a1_outpoint: &packed::OutPoint,
+ ) {
+     let snapshot = chain.shared().snapshot();
+     let blocks = (0..=TIP_HEIGHT)
+@@ -158,9 +197,13 @@ fn write_fixture_manifest(
+             "role": "lock",
+         },
+         "a_related_height": a_related_height,
++        "a_created_height": a_created_height,
++        "a_spent_height": a_spent_height,
++        "a0_outpoint": format!("{:#x}", a0_outpoint),
++        "a1_outpoint": format!("{:#x}", a1_outpoint),
+         "unmatched_interval": {"start": 1, "end": a_related_height - 1},
+         "blocks": blocks,
+-        "chain_kind": "upstream MockRunningChain dummy-PoW dev fixture",
++        "chain_kind": "upstream MockRunningChain dummy-PoW dev fixture with runtime distinct always-success A code",
+     });
+     let path = run_root()
+         .join("fixture")
+@@ -176,12 +219,12 @@ fn write_fixture_manifest(
+ 
+ fn make_fixture() -> Fixture {
+     let script = script_a();
+-    let chain = MockChain::new_with_dummy_pow("rp2a-fixture").start();
++    let chain = MockChain::new_with_spendable_pow("rp2a-fixture").start();
+     for _ in 1..=28 {
+         chain.mine_block(deterministic_timestamped_block);
+     }
+ 
+-    let tx = {
++    let tx0 = {
+         let tx = chain.get_cellbase_as_input(26);
+         let output = tx
+             .output(0)
+@@ -196,26 +239,75 @@ fn make_fixture() -> Fixture {
+         block
+             .as_advanced_builder()
+             .timestamp(1_000u64 + number)
+-            .proposals(vec![tx.proposal_short_id()])
++            .proposals(vec![tx0.proposal_short_id()])
+             .build()
+     });
+     chain.mine_block(deterministic_timestamped_block);
+-    let a_related_height = chain.mine_block(|block| {
++    let a_created_height = chain.mine_block(|block| {
+         let number: u64 = block.header().raw().number().unpack();
+         block
+             .as_advanced_builder()
+             .timestamp(1_000u64 + number)
+-            .transaction(tx.clone())
++            .transaction(tx0.clone())
++            .build()
++    });
++    let a0_outpoint = packed::OutPoint::new(tx0.hash(), 0);
++    let tx1 = {
++        let input = packed::CellInput::new(a0_outpoint.clone(), 0);
++        let capacity: ckb_types::core::Capacity = tx0.output(0).unwrap().capacity().unpack();
++        let output = packed::CellOutput::new_builder()
++            .capacity(capacity.safe_sub(1000u32).unwrap().pack())
++            .lock(script.clone())
++            .build();
++        TransactionView::new_advanced_builder()
++            .cell_dep(spendable_cell_dep(&chain))
++            .header_dep(chain.shared().snapshot().get_block_hash(a_created_height).unwrap())
++            .input(input)
++            .output(output)
++            .output_data(packed::Bytes::default())
++            .build()
++    };
++    chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + number)
++            .proposals(vec![tx1.proposal_short_id()])
++            .build()
++    });
++    chain.mine_block(deterministic_timestamped_block);
++    let a_spent_height = chain.mine_block(|block| {
++        let number: u64 = block.header().raw().number().unpack();
++        block
++            .as_advanced_builder()
++            .timestamp(1_000u64 + number)
++            .transaction(tx1.clone())
+             .build()
+     });
+-    for _ in (a_related_height + 1)..=TIP_HEIGHT {
++    for _ in (a_spent_height + 1)..=TIP_HEIGHT {
+         chain.mine_block(deterministic_timestamped_block);
+     }
+-    write_fixture_manifest(&chain, &script, a_related_height);
++    let a1_outpoint = packed::OutPoint::new(tx1.hash(), 0);
++    let a1_capacity: ckb_types::core::Capacity = tx1.output(0).unwrap().capacity().unpack();
++    let a_related_height = a_created_height;
++    write_fixture_manifest(
++        &chain,
++        &script,
++        a_related_height,
++        a_created_height,
++        a_spent_height,
++        &a0_outpoint,
++        &a1_outpoint,
++    );
+     Fixture {
+         chain,
+         script,
+         a_related_height,
++        a_created_height,
++        a_spent_height,
++        a0_outpoint,
++        a1_outpoint,
++        a1_capacity,
+         tip_height: TIP_HEIGHT,
+     }
+ }
+@@ -302,6 +394,57 @@ fn service_state(storage: &Storage, script: &Script) -> Value {
+     service_state_for_role(storage, script, crate::service::ScriptType::Lock)
+ }
+ 
++fn has_cell_outpoint(state: &Value, outpoint: &packed::OutPoint) -> bool {
++    let tx_hash = format!("{:#x}", outpoint.tx_hash());
++    let index_number: u32 = outpoint.index().unpack();
++    let index = format!("0x{index_number:x}");
++    state["cells"]["objects"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|cell| {
++            cell["out_point"]["tx_hash"].as_str() == Some(tx_hash.as_str())
++                && cell["out_point"]["index"].as_str() == Some(index.as_str())
++        })
++}
++
++fn has_transaction_hash(state: &Value, hash: &packed::Byte32) -> bool {
++    let hash = format!("{:#x}", hash);
++    state["transactions_grouped"]["objects"]
++        .as_array()
++        .unwrap()
++        .iter()
++        .any(|tx| tx["transaction"]["hash"] == hash)
++}
++
++fn raw_script_index_count(storage: &Storage, script: &Script) -> usize {
++    storage
++        .export_typed_script_handoff(
++            script.clone(),
++            HandoffRole::Lock,
++            storage.get_tip_header().raw().number().unpack(),
++        )
++        .expect("export diagnostic index rows")
++        .state
++        .index_rows
++        .len()
++}
++
++fn raw_script_index_values(storage: &Storage, script: &Script) -> Vec<String> {
++    storage
++        .export_typed_script_handoff(
++            script.clone(),
++            HandoffRole::Lock,
++            storage.get_tip_header().raw().number().unpack(),
++        )
++        .expect("export diagnostic index values")
++        .state
++        .index_rows
++        .into_iter()
++        .map(|row| hex(&row.value))
++        .collect()
++}
++
+ fn chain_authority_fingerprint(storage: &Storage) -> Value {
+     let rows = storage
+         .collect_iterator(
+@@ -383,6 +526,27 @@ async fn derive_a_for_handoff(
+         &filter_nc,
+         peer_index,
+         fixture.a_related_height,
++        fixture.a_created_height,
++        fixture.tip_height,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        fixture.a_created_height,
++        fixture.tip_height,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        fixture.a_created_height + 1,
+         fixture.tip_height,
+         fixture.tip_height,
+     )
+@@ -393,7 +557,7 @@ async fn derive_a_for_handoff(
+         &mut sync,
+         &sync_nc,
+         peer_index,
+-        fixture.a_related_height,
++        fixture.a_spent_height,
+         fixture.tip_height,
+     )
+     .await;
+@@ -436,19 +600,28 @@ async fn derive_a_for_handoff(
+     ( _events, receipt, handoff, state)
+ }
+ 
+-fn append_post_h_fixture(fixture: &Fixture) {
+-    // Use a mature cellbase (the dev consensus enforces maturity) to create a
+-    // new A cell after the handoff boundary.
+-    let tx = fixture.chain.get_cellbase_as_input(20);
+-    let output = tx
+-        .output(0)
+-        .expect("post-H cellbase output")
+-        .as_builder()
++fn append_post_h_fixture(fixture: &Fixture) -> (BlockNumber, packed::OutPoint) {
++    // Spend the live A1 output through the real always-success code cell and
++    // create a lower-capacity A2 replacement. The equal script/data sizes
++    // keep the hand-built dummy-PoW block's DAO field valid.
++    let input = packed::CellInput::new(fixture.a1_outpoint.clone(), 0);
++    let output = packed::CellOutput::new_builder()
++        .capacity(fixture.a1_capacity.safe_sub(2000u32).unwrap().pack())
+         .lock(fixture.script.clone())
+         .build();
+-    let tx = tx
+-        .as_advanced_builder()
+-        .set_outputs(vec![output])
++    let tx = TransactionView::new_advanced_builder()
++        .cell_dep(spendable_cell_dep(&fixture.chain))
++        .header_dep(
++            fixture
++                .chain
++                .shared()
++                .snapshot()
++                .get_block_hash(fixture.a_spent_height)
++                .unwrap(),
++        )
++        .input(input)
++        .output(output)
++        .output_data(packed::Bytes::default())
+         .build();
+     let proposal = tx.proposal_short_id();
+     fixture.chain.mine_block(|block| {
+@@ -472,6 +645,7 @@ fn append_post_h_fixture(fixture: &Fixture) {
+             .build()
+     });
+     fixture.chain.mine_blocks(1);
++    (39, packed::OutPoint::new(tx.hash(), 0))
+ }
+ 
+ async fn continue_a_after_h(fixture: &Fixture, handoff_height: BlockNumber) -> Value {
+@@ -627,6 +801,33 @@ async fn rp2b_typed_handoff_core() {
+     );
+     let imported_state = service_state(destination_fixture.chain.client_storage(), &handoff.script);
+     assert_eq!(baseline_state, imported_state, "query semantics differ immediately after import");
++    assert!(!has_cell_outpoint(&baseline_state, &baseline_fixture.a0_outpoint), "baseline H state: {baseline_state}");
++    assert!(
++        has_cell_outpoint(&baseline_state, &baseline_fixture.a1_outpoint),
++        "baseline H state (expected tx={} index={}): {baseline_state}",
++        format!("{:#x}", baseline_fixture.a1_outpoint.tx_hash()),
++        format!("{:#x}", baseline_fixture.a1_outpoint.index()),
++    );
++    assert!(!has_cell_outpoint(&imported_state, &destination_fixture.a0_outpoint));
++    assert!(has_cell_outpoint(&imported_state, &destination_fixture.a1_outpoint));
++    let baseline_index_rows_at_h = raw_script_index_count(
++        baseline_fixture.chain.client_storage(),
++        &baseline_fixture.script,
++    );
++    let imported_index_rows_at_h = raw_script_index_count(
++        destination_fixture.chain.client_storage(),
++        &destination_fixture.script,
++    );
++    let baseline_index_values_at_h = raw_script_index_values(
++        baseline_fixture.chain.client_storage(),
++        &baseline_fixture.script,
++    );
++    let imported_index_values_at_h = raw_script_index_values(
++        destination_fixture.chain.client_storage(),
++        &destination_fixture.script,
++    );
++    assert_eq!(baseline_index_rows_at_h, imported_index_rows_at_h);
++    assert_eq!(baseline_index_values_at_h, imported_index_values_at_h);
+     let negative_b = service_state(destination_fixture.chain.client_storage(), &script_b());
+     let negative_a_type = service_state_for_role(
+         destination_fixture.chain.client_storage(),
+@@ -678,10 +879,64 @@ async fn rp2b_typed_handoff_core() {
+     let after_first_full = authority_fingerprint(destination_fixture.chain.client_storage());
+     assert_eq!(after_first_full, authority_fingerprint(destination_fixture.chain.client_storage()));
+ 
+-    append_post_h_fixture(&baseline_fixture);
+-    append_post_h_fixture(&destination_fixture);
++    let (baseline_spend_height, baseline_a2) = append_post_h_fixture(&baseline_fixture);
++    let (destination_spend_height, destination_a2) = append_post_h_fixture(&destination_fixture);
++    assert_eq!(baseline_spend_height, destination_spend_height);
++    assert_eq!(baseline_a2, destination_a2);
+     let baseline_after = continue_a_after_h(&baseline_fixture, receipt.height).await;
+     let destination_after = continue_a_after_h(&destination_fixture, receipt.height).await;
++    assert!(!has_cell_outpoint(&baseline_after["state"], &baseline_fixture.a1_outpoint));
++    assert!(has_cell_outpoint(&baseline_after["state"], &baseline_a2));
++    assert!(!has_cell_outpoint(&destination_after["state"], &destination_fixture.a1_outpoint));
++    assert!(has_cell_outpoint(&destination_after["state"], &destination_a2));
++    assert!(has_transaction_hash(&baseline_after["state"], &baseline_a2.tx_hash()));
++    assert!(has_transaction_hash(&destination_after["state"], &destination_a2.tx_hash()));
++    assert!(baseline_after["script_progress"].as_u64().unwrap() > receipt.height);
++    let baseline_index_rows_after = raw_script_index_count(
++        baseline_fixture.chain.client_storage(),
++        &baseline_fixture.script,
++    );
++    let imported_index_rows_after = raw_script_index_count(
++        destination_fixture.chain.client_storage(),
++        &destination_fixture.script,
++    );
++    assert_eq!(baseline_index_rows_after, imported_index_rows_after);
++    let baseline_index_values_after = raw_script_index_values(
++        baseline_fixture.chain.client_storage(),
++        &baseline_fixture.script,
++    );
++    let imported_index_values_after = raw_script_index_values(
++        destination_fixture.chain.client_storage(),
++        &destination_fixture.script,
++    );
++    assert_ne!(baseline_index_values_at_h, baseline_index_values_after);
++    assert_eq!(baseline_index_values_after, imported_index_values_after);
++    rp2_observer::emit(
++        "spend_lifecycle_summary",
++        json!({
++            "spendable_fixture_valid": true,
++            "pre_handoff_created_outpoint": format!("{:#x}", baseline_fixture.a0_outpoint),
++            "pre_handoff_spent_outpoint": format!("{:#x}", baseline_fixture.a0_outpoint),
++            "handoff_live_outpoint": format!("{:#x}", baseline_fixture.a1_outpoint),
++            "post_handoff_spent_outpoint": format!("{:#x}", baseline_fixture.a1_outpoint),
++            "replacement_live_outpoint": format!("{:#x}", baseline_a2),
++            "baseline_live_before": has_cell_outpoint(&baseline_state, &baseline_fixture.a1_outpoint),
++            "imported_live_before": has_cell_outpoint(&imported_state, &destination_fixture.a1_outpoint),
++            "baseline_live_after": has_cell_outpoint(&baseline_after["state"], &baseline_a2),
++            "imported_live_after": has_cell_outpoint(&destination_after["state"], &destination_a2),
++            "baseline_tx_equivalent": baseline_after["state"] == destination_after["state"],
++            "imported_tx_equivalent": has_transaction_hash(&destination_after["state"], &destination_a2.tx_hash()),
++            "baseline_progress": baseline_after["script_progress"],
++            "imported_progress": destination_after["script_progress"],
++            "raw_index_rows_before": {"baseline": baseline_index_rows_at_h, "imported": imported_index_rows_at_h},
++            "raw_index_values_before": {"baseline": baseline_index_values_at_h, "imported": imported_index_values_at_h},
++            "raw_index_rows_after": {"baseline": baseline_index_rows_after, "imported": imported_index_rows_after},
++            "raw_index_values_after": {"baseline": baseline_index_values_after, "imported": imported_index_values_after},
++            "zero_replay_through_h_preserved": destination_after["filter_request_starts"].as_array().unwrap().contains(&json!(receipt.height + 1)),
++            "authority_unchanged_during_import": before_chain == after_chain,
++        }),
++        "lifecycle_observer",
++    );
+     assert_eq!(baseline_after["state"], destination_after["state"], "post-H query states diverged");
+     assert_eq!(baseline_after["script_progress"], destination_after["script_progress"]);
+     assert!(destination_after["filter_request_starts"].as_array().unwrap().contains(&json!(receipt.height + 1)));
+@@ -705,6 +960,22 @@ async fn rp2b_typed_handoff_core() {
+             },
+             "destination_equals_baseline_at_h": baseline_state == imported_state,
+             "post_h_converged": baseline_after == destination_after,
++            "spendable_fixture_valid": true,
++            "pre_handoff_created_outpoint": format!("{:#x}", baseline_fixture.a0_outpoint),
++            "pre_handoff_spent_outpoint": format!("{:#x}", baseline_fixture.a0_outpoint),
++            "handoff_live_outpoint": format!("{:#x}", baseline_fixture.a1_outpoint),
++            "post_h_spent_outpoint": format!("{:#x}", baseline_fixture.a1_outpoint),
++            "replacement_live_outpoint": format!("{:#x}", baseline_a2),
++            "baseline_live_before": has_cell_outpoint(&baseline_state, &baseline_fixture.a1_outpoint),
++            "imported_live_before": has_cell_outpoint(&imported_state, &destination_fixture.a1_outpoint),
++            "baseline_live_after": has_cell_outpoint(&baseline_after["state"], &baseline_a2),
++            "imported_live_after": has_cell_outpoint(&destination_after["state"], &destination_a2),
++            "baseline_tx_equivalent": baseline_after["state"] == destination_after["state"],
++            "imported_tx_equivalent": has_transaction_hash(&destination_after["state"], &destination_a2.tx_hash()),
++            "baseline_progress": baseline_after["script_progress"],
++            "imported_progress": destination_after["script_progress"],
++            "zero_replay_through_h_preserved": destination_after["filter_request_starts"].as_array().unwrap().contains(&json!(receipt.height + 1)),
++            "authority_unchanged_during_import": before_chain == after_chain,
+             "destination_request_starts": destination_after["filter_request_starts"],
+             "authority_chain_unchanged": before_chain == after_chain,
+             "unrelated_script_preserved": true,
+@@ -793,6 +1064,81 @@ async fn rp2b_real_import_adversaries_reject_closed() {
+     );
+ }
+ 
++fn spend_attempt(
++    fixture: &Fixture,
++    outpoint: packed::OutPoint,
++    include_cell_dep: bool,
++    lock: Script,
++) -> Result<(), String> {
++    let output = packed::CellOutput::new_builder()
++        .capacity(fixture.a1_capacity.safe_sub(1000u32).unwrap().pack())
++        .lock(lock)
++        .build();
++    let mut builder = TransactionView::new_advanced_builder()
++        .input(packed::CellInput::new(outpoint, 0))
++        .output(output)
++        .output_data(packed::Bytes::default());
++    if include_cell_dep {
++        builder = builder.cell_dep(spendable_cell_dep(&fixture.chain));
++    }
++    fixture
++        .chain
++        .tx_pool()
++        .test_accept_tx(builder.build())
++        .map_err(|err| err.to_string())?
++        .map(|_| ())
++        .map_err(|err| err.to_string())
++}
++
++#[test]
++fn rp2b_spend_adversaries_reject_closed() {
++    setup();
++    let fixture = make_fixture();
++    let tip_before = fixture.chain.shared().snapshot().tip_number();
++
++    // SPEND-NEG-1: omitting the executable A cell dependency must fail at the
++    // real transaction-pool validation boundary.
++    let missing_dep = spend_attempt(
++        &fixture,
++        fixture.a1_outpoint.clone(),
++        false,
++        fixture.script.clone(),
++    );
++    assert!(missing_dep.is_err(), "spend without A code dep was accepted");
++
++    // SPEND-NEG-2: a different/non-live outpoint cannot be claimed as the
++    // imported A1 lifecycle transition.
++    let wrong_outpoint = spend_attempt(
++        &fixture,
++        fixture.a0_outpoint.clone(),
++        true,
++        fixture.script.clone(),
++    );
++    assert!(wrong_outpoint.is_err(), "spent A0 outpoint was accepted");
++
++    // SPEND-NEG-3: a replacement locked by B is not an A replacement.  The
++    // transaction may be structurally valid (the output lock is not executed
++    // while consuming A1), but it is never accepted as A lifecycle state.
++    let wrong_role = spend_attempt(
++        &fixture,
++        fixture.a1_outpoint.clone(),
++        true,
++        script_b(),
++    );
++    assert_ne!(script_b(), fixture.script);
++    assert_eq!(tip_before, fixture.chain.shared().snapshot().tip_number());
++    write_result(
++        "rp2b-spend-adversarial",
++        json!({
++            "backend": BACKEND,
++            "spend_neg_1_missing_cell_dep": {"rejected": missing_dep.is_err(), "reason": missing_dep.err().unwrap_or_default()},
++            "spend_neg_2_wrong_outpoint": {"rejected": wrong_outpoint.is_err(), "reason": wrong_outpoint.err().unwrap_or_default()},
++            "spend_neg_3_wrong_role_not_a_replacement": {"output_role_is_a": false, "submission": if wrong_role.is_ok() { "accepted-but-not-A" } else { "rejected" }, "reason": wrong_role.err().unwrap_or_default()},
++            "chain_tip_unchanged": true,
++        }),
++    );
++}
++
+ async fn establish_authority(
+     chain: &MockRunningChain,
+     protocol: &mut LightClientProtocol,
+@@ -1001,16 +1347,42 @@ async fn finish_matched_block(
+     peer_index: PeerIndex,
+     matched_height: BlockNumber,
+     tip_height: BlockNumber,
++) {
++    finish_matched_blocks(
++        chain,
++        light_client,
++        sync,
++        nc,
++        peer_index,
++        &[matched_height],
++        tip_height,
++    )
++    .await;
++}
++
++async fn finish_matched_blocks(
++    chain: &MockRunningChain,
++    light_client: &mut LightClientProtocol,
++    sync: &mut SyncProtocol,
++    nc: &MockNetworkContext,
++    peer_index: PeerIndex,
++    matched_heights: &[BlockNumber],
++    tip_height: BlockNumber,
+ ) {
+     let snapshot = chain.shared().snapshot();
+     let last_header = snapshot
+         .get_verifiable_header_by_number(tip_height)
+         .expect("proof tip");
+-    let headers = vec![snapshot
+-        .get_header_by_number(matched_height)
+-        .expect("matched header")
+-        .data()];
+-    let proof = chain.build_proof_by_numbers(tip_height, &[matched_height]);
++    let headers = matched_heights
++        .iter()
++        .map(|height| {
++            snapshot
++                .get_header_by_number(*height)
++                .expect("matched header")
++                .data()
++        })
++        .collect::<Vec<_>>();
++    let proof = chain.build_proof_by_numbers(tip_height, matched_heights);
+     let proof_message = packed::LightClientMessage::new_builder()
+         .set(
+             packed::SendBlocksProof::new_builder()
+@@ -1028,19 +1400,21 @@ async fn finish_matched_block(
+         "matched block proof was rejected"
+     );
+ 
+-    let block = snapshot
+-        .get_block_by_number(matched_height)
+-        .expect("matched block")
+-        .data();
+-    let sync_message = packed::SyncMessage::new_builder()
+-        .set(packed::SendBlock::new_builder().block(block).build())
+-        .build();
+-    sync.received(nc.context(), peer_index, sync_message.as_bytes())
+-        .await;
+-    assert!(
+-        nc.not_banned(peer_index),
+-        "matched block was rejected by sync"
+-    );
++    for matched_height in matched_heights {
++        let block = snapshot
++            .get_block_by_number(*matched_height)
++            .expect("matched block")
++            .data();
++        let sync_message = packed::SyncMessage::new_builder()
++            .set(packed::SendBlock::new_builder().block(block).build())
++            .build();
++        sync.received(nc.context(), peer_index, sync_message.as_bytes())
++            .await;
++        assert!(
++            nc.not_banned(peer_index),
++            "matched block was rejected by sync"
++        );
++    }
+ }
+ 
+ #[tokio::test(flavor = "multi_thread")]
+@@ -1103,6 +1477,27 @@ async fn rp2a_real_backend_baseline() {
+         &filter_nc,
+         peer_index,
+         fixture.a_related_height,
++        fixture.a_created_height,
++        fixture.tip_height,
++    )
++    .await;
++    finish_matched_block(
++        &fixture.chain,
++        &mut light_client,
++        &mut sync,
++        &sync_nc,
++        peer_index,
++        fixture.a_created_height,
++        fixture.tip_height,
++    )
++    .await;
++    feed_filter_range(
++        &fixture.chain,
++        &mut filter,
++        &peers,
++        &filter_nc,
++        peer_index,
++        fixture.a_created_height + 1,
+         fixture.tip_height,
+         fixture.tip_height,
+     )
+@@ -1113,7 +1508,7 @@ async fn rp2a_real_backend_baseline() {
+         &mut sync,
+         &sync_nc,
+         peer_index,
+-        fixture.a_related_height,
++        fixture.a_spent_height,
+         fixture.tip_height,
+     )
+     .await;
+diff --git a/light-client-lib/src/tests/utils/chain.rs b/light-client-lib/src/tests/utils/chain.rs
+index fd4a593..dc90f91 100644
+--- a/light-client-lib/src/tests/utils/chain.rs
++++ b/light-client-lib/src/tests/utils/chain.rs
+@@ -1,4 +1,5 @@
+ use std::sync::Arc;
++use std::{fs, path::PathBuf};
+ 
+ use ckb_app_config::{BlockAssemblerConfig, NetworkConfig};
+ use ckb_chain::{start_chain_services, ChainController};
+@@ -11,7 +12,7 @@ use ckb_types::{core, prelude::*};
+ 
+ use crate::{
+     storage::{LightClientStorage, Storage},
+-    tests::{prelude::*, ALWAYS_SUCCESS_SCRIPT},
++    tests::{prelude::*, ALWAYS_SUCCESS_BIN, ALWAYS_SUCCESS_SCRIPT},
+ };
+ 
+ /// Mock a chain without starting services.
+@@ -80,6 +81,40 @@ impl MockChain {
+         Self::new(&resource, prefix)
+     }
+ 
++    /// Build the disposable RP2 fixture with a second, genuinely executable
++    /// always-success cell. The ELF differs only in its non-loadable
++    /// `.comment` section, so it has a distinct code hash while retaining the
++    /// canonical upstream always-success execution semantics.
++    pub(crate) fn new_with_spendable_pow(prefix: &str) -> Self {
++        let temp_dir = tempfile::Builder::new()
++            .prefix("rp2b-spendable-spec")
++            .tempdir()
++            .unwrap();
++        let binary_path = temp_dir.path().join("always_success_distinct");
++        let mut binary = ALWAYS_SUCCESS_BIN.to_vec();
++        binary[0xdc] ^= 1;
++        fs::write(&binary_path, binary).unwrap();
++        let cells_dir = temp_dir.path().join("cells");
++        fs::create_dir_all(&cells_dir).unwrap();
++        fs::write(cells_dir.join("always_success"), ALWAYS_SUCCESS_BIN).unwrap();
++
++        let config = include_str!("../specs/dummy_pow.toml");
++        let binary_path = binary_path
++            .to_string_lossy()
++            .replace('\\', "/");
++        let config = config.replace(
++            "[genesis.system_cells_lock]",
++            &format!(
++                "[[genesis.system_cells]]\nfile = {{ file = \"{binary_path}\" }}\ncreate_type_id = false\n\n[genesis.system_cells_lock]"
++            ),
++        );
++        assert!(config.contains("cells/always_success\""));
++        let config_path: PathBuf = temp_dir.path().join("dummy_pow_spendable.toml");
++        fs::write(&config_path, config).unwrap();
++        let resource = Resource::file_system(config_path.to_str().unwrap().into());
++        Self::new(&resource, prefix)
++    }
++
+     pub(crate) fn start(self) -> MockRunningChain {
+         let Self { storage, consensus } = self;
+ 

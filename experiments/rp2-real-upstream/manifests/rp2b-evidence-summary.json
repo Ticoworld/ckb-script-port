@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "experiment": "D2-RP2B-typed-script-handoff-core",
+  "upstream_revision": "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+  "handoff": {
+    "genesis_hash": "0xc117b5518c0522988f761f61e6edcb2c59ea6c8e2d787e411c3ee8f5b3794f5b",
+    "script_role": "lock",
+    "script_hash": "0x8a5203dcaa35d0b43c7675af74ff4029d4197a5540fd1f15cfa83ba3a574b9c8",
+    "height": 36,
+    "hash": "0x0c75246f78f2ed60addf83fed18856de55deac420509f2766540ab01a35458b5",
+    "cursor": 36,
+    "coverage_start": 1,
+    "coverage_end": 36,
+    "next_filter_start": 37
+  },
+  "fixture": {
+    "spendable": true,
+    "script_code_hash": "0x9d9c7b16af412ae5c3d556bcc061b48ff0e3ba563b1e433e398ff49b516b45e3",
+    "a_created_height": 31,
+    "a_spent_height": 34,
+    "post_h_spent_height": 39,
+    "lifecycle": "A0 created -> spent before H -> A1 handed off -> spent after H -> A2 live"
+  },
+  "backends": {
+    "rocksdb": {
+      "source_baseline_equal_at_h": true,
+      "destination_equal_at_h": true,
+      "chain_authority_unchanged": true,
+      "imported_index_rows": 1,
+      "imported_transaction_rows": 3,
+      "recomputed_min_filtered": 36,
+      "post_h_converged": true,
+      "spendable_fixture_valid": true,
+      "pre_handoff_created_outpoint": "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+      "pre_handoff_spent_outpoint": "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+      "handoff_live_outpoint": "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+      "post_handoff_spent_outpoint": "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+      "replacement_live_outpoint": "0x7777171e70c79d8583b3f0d0c43ad519b7c6e7680ac193e8e9effa4ce78ae2500000000",
+      "baseline_live_before": true,
+      "imported_live_before": true,
+      "baseline_live_after": true,
+      "imported_live_after": true,
+      "baseline_tx_equivalent": true,
+      "imported_tx_equivalent": true,
+      "baseline_progress": 40,
+      "imported_progress": 40,
+      "zero_replay_through_h_preserved": true,
+      "authority_unchanged_during_import": true,
+      "destination_request_starts": [37],
+      "idempotent_reimport": true,
+      "unrelated_scripts_preserved": true,
+      "adversarial_imports_rejected": 7,
+      "spend_negatives": {
+        "missing_cell_dep_rejected": true,
+        "wrong_outpoint_rejected": true,
+        "wrong_role_not_interpreted_as_A": true
+      },
+      "verifier": {
+        "source": "NORMAL_FILTERED",
+        "baseline": "NORMAL_FILTERED",
+        "destination": "GENUINELY_NOT_REQUESTED",
+        "adversarial": "AUTHORITY_INVALID"
+      }
+    },
+    "sqlite": {
+      "source_baseline_equal_at_h": true,
+      "destination_equal_at_h": true,
+      "chain_authority_unchanged": true,
+      "imported_index_rows": 1,
+      "imported_transaction_rows": 3,
+      "recomputed_min_filtered": 36,
+      "post_h_converged": true,
+      "spendable_fixture_valid": true,
+      "pre_handoff_created_outpoint": "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+      "pre_handoff_spent_outpoint": "0xecf29e7bb5f6ad620ac97d49e8a956ee4e64e5193ff0c5959bda5c4336c6967800000000",
+      "handoff_live_outpoint": "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+      "post_handoff_spent_outpoint": "0xba5abb5521c7f8acdb243101dc5bbaaaf1bad3db1c13bc93eeff2295e50bbc6300000000",
+      "replacement_live_outpoint": "0x7777171e70c79d8583b3f0d0c43ad519b7c6e7680ac193e8e9effa4ce78ae2500000000",
+      "baseline_live_before": true,
+      "imported_live_before": true,
+      "baseline_live_after": true,
+      "imported_live_after": true,
+      "baseline_tx_equivalent": true,
+      "imported_tx_equivalent": true,
+      "baseline_progress": 40,
+      "imported_progress": 40,
+      "zero_replay_through_h_preserved": true,
+      "authority_unchanged_during_import": true,
+      "destination_request_starts": [37],
+      "idempotent_reimport": true,
+      "unrelated_scripts_preserved": true,
+      "adversarial_imports_rejected": 7,
+      "spend_negatives": {
+        "missing_cell_dep_rejected": true,
+        "wrong_outpoint_rejected": true,
+        "wrong_role_not_interpreted_as_A": true
+      },
+      "verifier": {
+        "source": "NORMAL_FILTERED",
+        "baseline": "NORMAL_FILTERED",
+        "destination": "GENUINELY_NOT_REQUESTED",
+        "adversarial": "AUTHORITY_INVALID"
+      }
+    }
+  },
+  "commands": [
+    "cargo test --manifest-path light-client-lib/Cargo.toml --no-run --locked",
+    "cargo test --manifest-path light-client-lib/Cargo.toml --no-run --no-default-features --features sqlite --locked",
+    "cargo test --manifest-path light-client-lib/Cargo.toml rp2a_ -- --test-threads=1 --nocapture",
+    "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2a_ -- --test-threads=1 --nocapture",
+    "cargo test --manifest-path light-client-lib/Cargo.toml rp2b_ -- --test-threads=1 --nocapture",
+    "cargo test --manifest-path light-client-lib/Cargo.toml --no-default-features --features sqlite rp2b_ -- --test-threads=1 --nocapture",
+    "python experiments/rp2-real-upstream/src/rp2a_verifier.py --events-dir experiments/rp2-real-upstream/run/events --output experiments/rp2-real-upstream/run/results/rp2b-verification.json"
+  ]
+}

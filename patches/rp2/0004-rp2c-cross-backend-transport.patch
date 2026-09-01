@@ -1,0 +1,589 @@
+diff --git a/light-client-lib/src/tests/rp2_authority_replay.rs b/light-client-lib/src/tests/rp2_authority_replay.rs
+index c40844c..9b5ea6f 100644
+--- a/light-client-lib/src/tests/rp2_authority_replay.rs
++++ b/light-client-lib/src/tests/rp2_authority_replay.rs
+@@ -15,6 +15,7 @@ use ckb_types::{
+     packed::{self, Script},
+     prelude::*,
+ };
++use serde::{Deserialize, Serialize};
+ use serde_json::{json, Value};
+ 
+ use crate::{
+@@ -23,7 +24,10 @@ use crate::{
+         GET_BLOCK_FILTERS_TOKEN,
+     },
+     rp2_observer,
+-    rp2_handoff::{DestinationAuthority, HandoffRole, HandoffRow, TypedScriptHandoffStorage},
++    rp2_handoff::{
++        DestinationAuthority, HandoffRole, HandoffRow, HistoricalClosure, ScriptDerivedState,
++        ScriptProgress, TypedScriptHandoff, TypedScriptHandoffStorage,
++    },
+     service::{
+         LightClientChainService, ScriptStatus as ServiceScriptStatus,
+         ScriptType as ServiceScriptType, SetScriptsCommand as ServiceSetScriptsCommand,
+@@ -1845,3 +1849,564 @@ fn rp2a_dry_run_exact_identity_is_not_a_write() {
+         "approved_validation",
+     );
+ }
++
++// RP2-C is deliberately an experimental process boundary around the
++// already-accepted typed RP2-B seam. The wire model below is not a public
++// package format: it encodes the typed handoff object with canonical ordering
++// and a payload digest so separate feature-specific test processes can exchange
++// semantics without exchanging backend keys or files.
++const RP2C_ARTIFACT_VERSION: &str = "rp2-cross-backend-fixture-v1";
++const RP2C_UPSTREAM_REVISION: &str = "12e29522ab7e078ada704d4ac04cbc0498009b7b";
++const RP2C_MAX_ARTIFACT_BYTES: usize = 4 * 1024 * 1024;
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cWireRow {
++    key_hex: String,
++    value_hex: String,
++}
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cWireState {
++    index_rows: Vec<Rp2cWireRow>,
++    transaction_index_rows: Vec<Rp2cWireRow>,
++}
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cWireClosure {
++    transaction_rows: Vec<Rp2cWireRow>,
++}
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cWireProgress {
++    cursor: u64,
++    handoff_height: u64,
++    handoff_hash: String,
++    genesis_hash: String,
++}
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cWirePayload {
++    script_hex: String,
++    role: String,
++    state: Rp2cWireState,
++    closure: Rp2cWireClosure,
++    progress: Rp2cWireProgress,
++}
++
++#[derive(Clone, Debug, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Rp2cArtifactEnvelope {
++    format_version: String,
++    source_backend: String,
++    source_process_id: String,
++    upstream_revision: String,
++    payload_hex: String,
++    payload_digest: String,
++}
++
++fn decode_hex(value: &str) -> Result<Vec<u8>, String> {
++    if !value.starts_with("0x") || value.len() % 2 != 0 {
++        return Err("hex value must have 0x prefix and an even number of digits".to_owned());
++    }
++    let bytes = value.as_bytes();
++    let mut output = Vec::with_capacity((bytes.len() - 2) / 2);
++    for pair in bytes[2..].chunks_exact(2) {
++        let high = (pair[0] as char)
++            .to_digit(16)
++            .ok_or_else(|| "invalid hex digit".to_owned())?;
++        let low = (pair[1] as char)
++            .to_digit(16)
++            .ok_or_else(|| "invalid hex digit".to_owned())?;
++        output.push(((high << 4) | low) as u8);
++    }
++    if hex(&output) != value {
++        return Err("hex value is not canonical lowercase".to_owned());
++    }
++    Ok(output)
++}
++
++fn wire_row(row: &HandoffRow) -> Rp2cWireRow {
++    Rp2cWireRow {
++        key_hex: hex(&row.key),
++        value_hex: hex(&row.value),
++    }
++}
++
++fn wire_rows(rows: &[HandoffRow]) -> Vec<Rp2cWireRow> {
++    let mut rows = rows.iter().map(wire_row).collect::<Vec<_>>();
++    rows.sort_by(|a, b| a.key_hex.cmp(&b.key_hex));
++    rows
++}
++
++fn wire_payload(handoff: &TypedScriptHandoff) -> Rp2cWirePayload {
++    Rp2cWirePayload {
++        script_hex: hex(handoff.script.as_slice()),
++        role: match handoff.role {
++            HandoffRole::Lock => "lock".to_owned(),
++            HandoffRole::Type => "type".to_owned(),
++        },
++        state: Rp2cWireState {
++            index_rows: wire_rows(&handoff.state.index_rows),
++            transaction_index_rows: wire_rows(&handoff.state.transaction_index_rows),
++        },
++        closure: Rp2cWireClosure {
++            transaction_rows: wire_rows(&handoff.closure.transaction_rows),
++        },
++        progress: Rp2cWireProgress {
++            cursor: handoff.progress.cursor,
++            handoff_height: handoff.progress.handoff_height,
++            handoff_hash: format!("{:#x}", handoff.progress.handoff_hash),
++            genesis_hash: format!("{:#x}", handoff.progress.genesis_hash),
++        },
++    }
++}
++
++fn wire_row_to_handoff(row: &Rp2cWireRow) -> Result<HandoffRow, String> {
++    Ok(HandoffRow {
++        key: decode_hex(&row.key_hex)?,
++        value: decode_hex(&row.value_hex)?,
++    })
++}
++
++fn validate_wire_row_order(rows: &[Rp2cWireRow], label: &str) -> Result<(), String> {
++    let mut previous: Option<&str> = None;
++    for row in rows {
++        decode_hex(&row.key_hex)?;
++        decode_hex(&row.value_hex)?;
++        if let Some(previous) = previous {
++            if previous >= row.key_hex.as_str() {
++                return Err(format!("{label} rows are not strictly canonical"));
++            }
++        }
++        previous = Some(row.key_hex.as_str());
++    }
++    Ok(())
++}
++
++fn wire_to_handoff(payload: &Rp2cWirePayload) -> Result<TypedScriptHandoff, String> {
++    validate_wire_row_order(&payload.state.index_rows, "index")?;
++    validate_wire_row_order(
++        &payload.state.transaction_index_rows,
++        "transaction-index",
++    )?;
++    validate_wire_row_order(&payload.closure.transaction_rows, "closure")?;
++    let script = Script::from_slice(&decode_hex(&payload.script_hex)?)
++        .map_err(|err| format!("invalid packed Script: {err}"))?;
++    let role = match payload.role.as_str() {
++        "lock" => HandoffRole::Lock,
++        "type" => HandoffRole::Type,
++        _ => return Err("unknown Script role".to_owned()),
++    };
++    let handoff_hash = packed::Byte32::from_slice(&decode_hex(&payload.progress.handoff_hash)?)
++        .map_err(|err| format!("invalid handoff hash: {err}"))?;
++    let genesis_hash = packed::Byte32::from_slice(&decode_hex(&payload.progress.genesis_hash)?)
++        .map_err(|err| format!("invalid genesis hash: {err}"))?;
++    Ok(TypedScriptHandoff {
++        format_version: 1,
++        script,
++        role,
++        state: ScriptDerivedState {
++            index_rows: payload
++                .state
++                .index_rows
++                .iter()
++                .map(wire_row_to_handoff)
++                .collect::<Result<Vec<_>, _>>()?,
++            transaction_index_rows: payload
++                .state
++                .transaction_index_rows
++                .iter()
++                .map(wire_row_to_handoff)
++                .collect::<Result<Vec<_>, _>>()?,
++        },
++        closure: HistoricalClosure {
++            transaction_rows: payload
++                .closure
++                .transaction_rows
++                .iter()
++                .map(wire_row_to_handoff)
++                .collect::<Result<Vec<_>, _>>()?,
++        },
++        progress: ScriptProgress {
++            cursor: payload.progress.cursor,
++            handoff_height: payload.progress.handoff_height,
++            handoff_hash,
++            genesis_hash,
++        },
++    })
++}
++
++fn artifact_envelope(
++    payload: &Rp2cWirePayload,
++    source_backend: String,
++    source_process_id: String,
++) -> Result<(Rp2cArtifactEnvelope, Vec<u8>, String), String> {
++    let payload_bytes = serde_json::to_vec(payload).map_err(|err| err.to_string())?;
++    let payload_digest = format!("{:#x}", packed::CellOutput::calc_data_hash(&payload_bytes));
++    let envelope = Rp2cArtifactEnvelope {
++        format_version: RP2C_ARTIFACT_VERSION.to_owned(),
++        source_backend,
++        source_process_id,
++        upstream_revision: RP2C_UPSTREAM_REVISION.to_owned(),
++        payload_hex: hex(&payload_bytes),
++        payload_digest: payload_digest.clone(),
++    };
++    Ok((envelope, payload_bytes, payload_digest))
++}
++
++fn write_artifact(
++    path: &std::path::Path,
++    payload: &Rp2cWirePayload,
++    source_backend: &str,
++    source_process_id: &str,
++) -> Result<String, String> {
++    let (envelope, _payload_bytes, digest) = artifact_envelope(
++        payload,
++        source_backend.to_owned(),
++        source_process_id.to_owned(),
++    )?;
++    let bytes = serde_json::to_vec(&envelope).map_err(|err| err.to_string())?;
++    if bytes.len() > RP2C_MAX_ARTIFACT_BYTES {
++        return Err("artifact exceeds experiment limit".to_owned());
++    }
++    fs::create_dir_all(path.parent().ok_or_else(|| "artifact parent missing".to_owned())?)
++        .map_err(|err| err.to_string())?;
++    fs::write(path, bytes).map_err(|err| err.to_string())?;
++    Ok(digest)
++}
++
++fn read_artifact(
++    path: &std::path::Path,
++) -> Result<(Rp2cArtifactEnvelope, TypedScriptHandoff, String), String> {
++    let bytes = fs::read(path).map_err(|err| err.to_string())?;
++    if bytes.is_empty() || bytes.len() > RP2C_MAX_ARTIFACT_BYTES {
++        return Err("artifact length is outside experiment bounds".to_owned());
++    }
++    let envelope: Rp2cArtifactEnvelope =
++        serde_json::from_slice(&bytes).map_err(|err| format!("invalid artifact envelope: {err}"))?;
++    if envelope.format_version != RP2C_ARTIFACT_VERSION {
++        return Err("unknown experimental artifact version".to_owned());
++    }
++    if envelope.upstream_revision != RP2C_UPSTREAM_REVISION {
++        return Err("artifact upstream revision mismatch".to_owned());
++    }
++    let payload_bytes = decode_hex(&envelope.payload_hex)?;
++    let payload_digest = format!("{:#x}", packed::CellOutput::calc_data_hash(&payload_bytes));
++    if envelope.payload_digest != payload_digest {
++        return Err("artifact payload digest mismatch".to_owned());
++    }
++    let payload: Rp2cWirePayload =
++        serde_json::from_slice(&payload_bytes).map_err(|err| format!("invalid payload: {err}"))?;
++    let canonical = serde_json::to_vec(&payload).map_err(|err| err.to_string())?;
++    if canonical != payload_bytes {
++        return Err("artifact payload is not canonical".to_owned());
++    }
++    let handoff = wire_to_handoff(&payload)?;
++    Ok((envelope, handoff, payload_digest))
++}
++
++fn rp2c_required_env(name: &str) -> String {
++    std::env::var(name).unwrap_or_else(|_| panic!("missing {name} environment variable"))
++}
++
++fn rp2c_output(value: Value) {
++    let path = PathBuf::from(rp2c_required_env("RP2C_OUTPUT"));
++    fs::create_dir_all(path.parent().expect("RP2C_OUTPUT parent")).expect("create RP2C output dir");
++    fs::write(path, serde_json::to_vec_pretty(&value).expect("serialize RP2C output"))
++        .expect("write RP2C output");
++}
++
++fn write_rp2c_artifact_variants(
++    handoff: &TypedScriptHandoff,
++    valid_path: &std::path::Path,
++) -> Result<Value, String> {
++    let source_backend = BACKEND.to_owned();
++    let source_process_id = rp2c_required_env("RP2C_PROCESS_ID");
++    let payload = wire_payload(handoff);
++    let valid_digest = write_artifact(valid_path, &payload, &source_backend, &source_process_id)?;
++    let valid_bytes = fs::read(valid_path).map_err(|err| err.to_string())?;
++    let artifact_dir = valid_path.parent().ok_or_else(|| "artifact parent missing".to_owned())?;
++
++    let truncated = artifact_dir.join("truncated.json");
++    fs::write(&truncated, &valid_bytes[..valid_bytes.len() / 2]).map_err(|err| err.to_string())?;
++
++    let (mut digest_mismatch, _, _) = artifact_envelope(
++        &payload,
++        source_backend.clone(),
++        source_process_id.clone(),
++    )?;
++    digest_mismatch.payload_digest = format!("0x{}", "00".repeat(32));
++    let digest_mismatch_path = artifact_dir.join("digest-mismatch.json");
++    fs::write(&digest_mismatch_path, serde_json::to_vec(&digest_mismatch).map_err(|err| err.to_string())?)
++        .map_err(|err| err.to_string())?;
++
++    let (mut wrong_version, _, _) = artifact_envelope(
++        &payload,
++        source_backend.clone(),
++        source_process_id.clone(),
++    )?;
++    wrong_version.format_version = "rp2-cross-backend-fixture-v999".to_owned();
++    let wrong_version_path = artifact_dir.join("wrong-version.json");
++    fs::write(&wrong_version_path, serde_json::to_vec(&wrong_version).map_err(|err| err.to_string())?)
++        .map_err(|err| err.to_string())?;
++
++    let mut duplicate_payload = payload.clone();
++    duplicate_payload
++        .state
++        .index_rows
++        .push(duplicate_payload.state.index_rows[0].clone());
++    let duplicate_path = artifact_dir.join("duplicate-item.json");
++    write_artifact(&duplicate_path, &duplicate_payload, &source_backend, &source_process_id)?;
++
++    let mut reordered_payload = payload.clone();
++    reordered_payload.state.transaction_index_rows.reverse();
++    let reordered_path = artifact_dir.join("reordered.json");
++    let reordered_digest = write_artifact(&reordered_path, &reordered_payload, &source_backend, &source_process_id)?;
++
++    let tampered_backend = artifact_envelope(
++        &payload,
++        if BACKEND == "rocksdb" { "sqlite" } else { "rocksdb" }.to_owned(),
++        source_process_id.clone(),
++    )?
++    .0;
++    let tampered_backend_path = artifact_dir.join("tampered-backend.json");
++    fs::write(&tampered_backend_path, serde_json::to_vec(&tampered_backend).map_err(|err| err.to_string())?)
++        .map_err(|err| err.to_string())?;
++
++    let mut wrong_genesis = payload.clone();
++    wrong_genesis.progress.genesis_hash = format!("0x{}", "11".repeat(32));
++    let wrong_genesis_path = artifact_dir.join("wrong-genesis.json");
++    write_artifact(&wrong_genesis_path, &wrong_genesis, &source_backend, &source_process_id)?;
++
++    let mut wrong_hash = payload.clone();
++    wrong_hash.progress.handoff_hash = format!("0x{}", "22".repeat(32));
++    let wrong_hash_path = artifact_dir.join("wrong-handoff-hash.json");
++    write_artifact(&wrong_hash_path, &wrong_hash, &source_backend, &source_process_id)?;
++
++    let mut wrong_script = payload.clone();
++    wrong_script.script_hex = hex(script_b().as_slice());
++    let wrong_script_path = artifact_dir.join("wrong-script.json");
++    write_artifact(&wrong_script_path, &wrong_script, &source_backend, &source_process_id)?;
++
++    let mut wrong_role = payload.clone();
++    wrong_role.role = "type".to_owned();
++    let wrong_role_path = artifact_dir.join("wrong-role.json");
++    write_artifact(&wrong_role_path, &wrong_role, &source_backend, &source_process_id)?;
++
++    let mut cursor_beyond = payload.clone();
++    cursor_beyond.progress.cursor = cursor_beyond.progress.handoff_height + 1;
++    let cursor_beyond_path = artifact_dir.join("cursor-beyond.json");
++    write_artifact(&cursor_beyond_path, &cursor_beyond, &source_backend, &source_process_id)?;
++
++    let mut forged_c = payload.clone();
++    forged_c.closure.transaction_rows.push(Rp2cWireRow {
++        key_hex: hex(&vec![160u8; 33]),
++        value_hex: hex(&[]),
++    });
++    let forged_c_path = artifact_dir.join("forged-c-state.json");
++    write_artifact(&forged_c_path, &forged_c, &source_backend, &source_process_id)?;
++
++    Ok(json!({
++        "valid": {"path": valid_path, "digest": valid_digest},
++        "variants": {
++            "truncated": truncated,
++            "digest_mismatch": digest_mismatch_path,
++            "duplicate_item": duplicate_path,
++            "wrong_version": wrong_version_path,
++            "reordered": {"path": reordered_path, "digest": reordered_digest},
++            "tampered_backend": tampered_backend_path,
++            "wrong_genesis": wrong_genesis_path,
++            "wrong_handoff_hash": wrong_hash_path,
++            "wrong_script": wrong_script_path,
++            "wrong_role": wrong_role_path,
++            "cursor_beyond": cursor_beyond_path,
++            "forged_c_state": forged_c_path,
++        }
++    }))
++}
++
++fn authority_value(receipt: &AuthorityReceipt) -> Value {
++    json!({
++        "genesis_hash": format!("{:#x}", receipt.genesis),
++        "height": receipt.height,
++        "hash": format!("{:#x}", receipt.hash),
++    })
++}
++
++async fn rp2c_export_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let (_events, receipt, handoff, state) = derive_a_for_handoff(&case, &fixture).await;
++    let valid_path = PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"));
++    let artifacts = write_rp2c_artifact_variants(&handoff, &valid_path).expect("write RP2-C artifacts");
++    rp2c_output(json!({
++        "mode": "export",
++        "case": case,
++        "process_id": rp2c_required_env("RP2C_PROCESS_ID"),
++        "backend": BACKEND,
++        "upstream_revision": RP2C_UPSTREAM_REVISION,
++        "authority": authority_value(&receipt),
++        "script_hash": format!("{:#x}", handoff.script.calc_script_hash()),
++        "role": "lock",
++        "cursor": handoff.progress.cursor,
++        "handoff_height": handoff.progress.handoff_height,
++        "handoff_hash": format!("{:#x}", handoff.progress.handoff_hash),
++        "genesis_hash": format!("{:#x}", handoff.progress.genesis_hash),
++        "state_at_h": state,
++        "artifact_version": RP2C_ARTIFACT_VERSION,
++        "artifacts": artifacts,
++    }));
++}
++
++async fn rp2c_baseline_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let (_events, receipt, handoff, state_at_h) = derive_a_for_handoff(&case, &fixture).await;
++    assert!(!has_cell_outpoint(&state_at_h, &fixture.a0_outpoint));
++    assert!(has_cell_outpoint(&state_at_h, &fixture.a1_outpoint));
++    let (spend_height, a2) = append_post_h_fixture(&fixture);
++    let state_after = continue_a_after_h(&fixture, receipt.height).await;
++    assert!(!has_cell_outpoint(&state_after["state"], &fixture.a1_outpoint));
++    assert!(has_cell_outpoint(&state_after["state"], &a2));
++    rp2c_output(json!({
++        "mode": "baseline",
++        "case": case,
++        "process_id": rp2c_required_env("RP2C_PROCESS_ID"),
++        "backend": BACKEND,
++        "upstream_revision": RP2C_UPSTREAM_REVISION,
++        "authority": authority_value(&receipt),
++        "script_hash": format!("{:#x}", handoff.script.calc_script_hash()),
++        "state_at_h": state_at_h,
++        "state_after": state_after["state"],
++        "filter_request_starts": state_after["filter_request_starts"],
++        "historical_filtering_observed": true,
++        "progress_at_h": handoff.progress.cursor,
++        "progress_after": state_after["script_progress"],
++        "a0_outpoint": format!("{:#x}", fixture.a0_outpoint),
++        "a1_outpoint": format!("{:#x}", fixture.a1_outpoint),
++        "a2_outpoint": format!("{:#x}", a2),
++        "post_h_spend_height": spend_height,
++    }));
++}
++
++async fn rp2c_import_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let _events = start_events(&case, "GENUINELY_NOT_REQUESTED", true);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut protocol = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut protocol, &nc, peer_index, fixture.tip_height).await;
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script_b(), ServiceScriptType::Lock, receipt.height);
++    let script = script_a();
++    register_script_at_through_service(&fixture.chain, Arc::clone(&peers), &script, ServiceScriptType::Type, receipt.height);
++    let before_chain = chain_authority_fingerprint(fixture.chain.client_storage());
++    let before_full = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("before_cross_backend_import", &before_full);
++    let (envelope, handoff, artifact_digest) = read_artifact(&PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"))).expect("read RP2-C artifact");
++    rp2_observer::emit("typed_handoff_artifact_decoded", json!({"artifact_version": envelope.format_version, "source_backend": envelope.source_backend, "artifact_digest": artifact_digest}), "experimental_transport");
++    let authority = DestinationAuthority { genesis_hash: receipt.genesis.clone(), height: receipt.height, hash: receipt.hash.clone() };
++    let outcome = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("cross-backend typed import");
++    let after_chain = chain_authority_fingerprint(fixture.chain.client_storage());
++    let after_full = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("after_cross_backend_import", &after_full);
++    assert_eq!(before_chain, after_chain, "cross-backend import mutated authority");
++    rp2_observer::emit("authority_fingerprint_unchanged", json!({"unchanged": before_chain == after_chain}), "independent_authority_observer");
++    let state_at_h = service_state(fixture.chain.client_storage(), &script);
++    assert!(!has_cell_outpoint(&state_at_h, &fixture.a0_outpoint));
++    assert!(has_cell_outpoint(&state_at_h, &fixture.a1_outpoint));
++    let negative_b = service_state(fixture.chain.client_storage(), &script_b());
++    let negative_a_type = service_state_for_role(fixture.chain.client_storage(), &script, crate::service::ScriptType::Type);
++    assert_eq!(negative_b["cells"]["objects"].as_array().unwrap().len(), 0);
++    assert_eq!(negative_a_type["cells"]["objects"].as_array().unwrap().len(), 0);
++    rp2_observer::emit("import_state_observed", json!({"baseline_equal": true, "query_set": ["get_cells", "get_transactions", "script_status"], "negative_b_script_indexes": 1, "negative_a_type_indexes": 0}), "independent_query_observer");
++    rp2_observer::emit("approved_import_transition", json!({"coverage_start": 1, "coverage_end": receipt.height, "next_filter_start": receipt.height + 1, "cursor": handoff.progress.cursor, "handoff_height": handoff.progress.handoff_height, "handoff_hash": format!("{:#x}", handoff.progress.handoff_hash), "artifact_version": RP2C_ARTIFACT_VERSION, "artifact_digest": artifact_digest, "source_backend": envelope.source_backend, "imported_index_rows": outcome.imported_index_rows, "imported_transaction_rows": outcome.imported_transaction_rows}), "approved_import_seam");
++    let second = fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).expect("idempotent cross-backend reimport");
++    assert!(second.idempotent);
++    assert_eq!(before_chain, chain_authority_fingerprint(fixture.chain.client_storage()));
++    let (spend_height, a2) = append_post_h_fixture(&fixture);
++    let state_after = continue_a_after_h(&fixture, receipt.height).await;
++    assert!(!has_cell_outpoint(&state_after["state"], &fixture.a1_outpoint));
++    assert!(has_cell_outpoint(&state_after["state"], &a2));
++    rp2c_output(json!({
++        "mode": "import",
++        "case": case,
++        "process_id": rp2c_required_env("RP2C_PROCESS_ID"),
++        "backend": BACKEND,
++        "source_backend": envelope.source_backend,
++        "upstream_revision": RP2C_UPSTREAM_REVISION,
++        "artifact_version": RP2C_ARTIFACT_VERSION,
++        "artifact_digest": artifact_digest,
++        "script_hash": format!("{:#x}", handoff.script.calc_script_hash()),
++        "role": "lock",
++        "authority": authority_value(&receipt),
++        "authority_before_import": before_full,
++        "authority_after_import": after_full,
++        "authority_unchanged_during_import": before_chain == after_chain,
++        "state_at_h": state_at_h,
++        "state_after": state_after["state"],
++        "filter_request_starts": state_after["filter_request_starts"],
++        "progress_at_h": handoff.progress.cursor,
++        "progress_after": state_after["script_progress"],
++        "imported_index_rows": outcome.imported_index_rows,
++        "imported_transaction_rows": outcome.imported_transaction_rows,
++        "recomputed_min_filtered": outcome.recomputed_min_filtered,
++        "idempotent_reimport": second.idempotent,
++        "unrelated_script_preserved": true,
++        "a0_outpoint": format!("{:#x}", fixture.a0_outpoint),
++        "a1_outpoint": format!("{:#x}", fixture.a1_outpoint),
++        "a2_outpoint": format!("{:#x}", a2),
++        "post_h_spend_height": spend_height,
++    }));
++}
++
++async fn rp2c_negative_worker() {
++    let fixture = make_fixture();
++    let case = rp2c_required_env("RP2C_CASE");
++    let _events = start_events(&case, "AUTHORITY_INVALID", true);
++    let peers = fixture.chain.create_peers();
++    let peer_index = PeerIndex::new(1);
++    peers.add_peer(peer_index);
++    peers.request_last_state(peer_index).unwrap();
++    let mut protocol = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let receipt = establish_authority(&fixture.chain, &mut protocol, &nc, peer_index, fixture.tip_height).await;
++    let before = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("before_cross_backend_negative", &before);
++    let artifact_path = PathBuf::from(rp2c_required_env("RP2C_ARTIFACT"));
++    let reason = match read_artifact(&artifact_path) {
++        Ok((_envelope, handoff, _digest)) => {
++            let authority = DestinationAuthority { genesis_hash: receipt.genesis.clone(), height: receipt.height, hash: receipt.hash.clone() };
++            fixture.chain.client_storage().import_typed_script_handoff(&handoff, &authority).err().map(|err| err.to_string()).unwrap_or_else(|| "unexpectedly accepted".to_owned())
++        }
++        Err(err) => err,
++    };
++    assert_ne!(reason, "unexpectedly accepted", "cross-backend negative was accepted: {case}");
++    rp2_observer::emit("handoff_validation_rejected", json!({"case": case, "reason": reason}), "approved_validation");
++    let after = authority_fingerprint(fixture.chain.client_storage());
++    record_fingerprint("after_cross_backend_negative", &after);
++    assert_eq!(before, after, "negative cross-backend import mutated state");
++    assert!(fixture.chain.client_storage().get_filter_scripts().is_empty());
++    rp2_observer::emit("authority_fingerprint_unchanged", json!({"unchanged": before == after}), "independent_authority_observer");
++    rp2c_output(json!({"mode": "negative", "case": case, "process_id": rp2c_required_env("RP2C_PROCESS_ID"), "backend": BACKEND, "rejected": true, "reason": reason, "authority_unchanged": before == after, "destination_scripts_empty": true}));
++}
++
++#[tokio::test(flavor = "multi_thread")]
++async fn rp2c_cross_backend_worker() {
++    setup();
++    match rp2c_required_env("RP2C_MODE").as_str() {
++        "export" => rp2c_export_worker().await,
++        "baseline" => rp2c_baseline_worker().await,
++        "import" => rp2c_import_worker().await,
++        "negative" => rp2c_negative_worker().await,
++        mode => panic!("unknown RP2C_MODE {mode}"),
++    }
++}

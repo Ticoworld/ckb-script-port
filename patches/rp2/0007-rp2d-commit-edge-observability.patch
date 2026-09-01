@@ -1,0 +1,84 @@
+diff --git "a/light-client-lib/src/storage/mod.rs" "b/light-client-lib/src/storage/mod.rs"
+index ddeddf6..c7b6545 100644
+--- "a/light-client-lib/src/storage/mod.rs"
++++ "b/light-client-lib/src/storage/mod.rs"
+@@ -132,6 +132,9 @@ pub(crate) fn import_lifecycle_for_path<P: AsRef<Path>>(path: P) -> Arc<ImportLi
+ 
+ #[cfg(all(test, not(target_arch = "wasm32")))]
+ pub(crate) fn rp2d_commit_signal(stage: &str) {
++    if std::env::var("RP2D_COMMIT_ARMED").ok().as_deref() != Some("1") {
++        return;
++    }
+     let Ok(path) = std::env::var("RP2D_COMMIT_SIGNAL") else { return };
+     use std::io::Write;
+     let mut file = std::fs::OpenOptions::new()
+diff --git "a/light-client-lib/src/tests/rp2_authority_replay.rs" "b/light-client-lib/src/tests/rp2_authority_replay.rs"
+index 39fc41c..1370796 100644
+--- "a/light-client-lib/src/tests/rp2_authority_replay.rs"
++++ "b/light-client-lib/src/tests/rp2_authority_replay.rs"
+@@ -2757,7 +2757,19 @@ async fn rp2d_reorg_import_worker() {
+     rp2_observer::emit("approved_import_transition", json!({"coverage_start": 1, "coverage_end": receipt.height, "next_filter_start": receipt.height + 1, "cursor": handoff.progress.cursor, "handoff_height": handoff.progress.handoff_height, "handoff_hash": format!("{:#x}", handoff.progress.handoff_hash), "artifact_digest": artifact_digest, "imported_index_rows": outcome.imported_index_rows, "imported_transaction_rows": outcome.imported_transaction_rows}), "approved_import_seam");
+     drop(_events);
+     let _events = start_events(&(case.clone() + "-reorg"), "NORMAL_FILTERED", true);
+-    let continuation_light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    let mut continuation_light_client = fixture.chain.create_light_client_protocol(Arc::clone(&peers));
++    // The offline guard requires the pre-import protocol owner to be dropped.
++    // Re-seed a fresh protocol instance with the already verified H authority
++    // before exercising the normal post-handoff reorg path.
++    let continuation_nc = MockNetworkContext::new(SupportProtocols::LightClient);
++    let _continuation_receipt = establish_authority(
++        &fixture.chain,
++        &mut continuation_light_client,
++        &continuation_nc,
++        peer_index,
++        receipt.height,
++    )
++    .await;
+     let result = process_rp2d_reorg(&fixture, continuation_light_client, peers, peer_index, &receipt, &(case.clone() + "-reorg")).await;
+     rp2c_output(json!({
+         "mode": "import-reorg",
+@@ -2868,6 +2880,9 @@ async fn rp2d_crash_import_worker() {
+     let (_envelope, handoff, digest) = read_artifact(&PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"))).expect("read crash artifact");
+     let authority = DestinationAuthority { genesis_hash: receipt.genesis, height: receipt.height, hash: receipt.hash };
+     drop(light_client);
++    // Arm commit-edge observability only after independent authority setup;
++    // earlier normal backend commits must not be mistaken for the handoff.
++    std::env::set_var("RP2D_COMMIT_ARMED", "1");
+     // The importer contains test-only process-abort points C0..C9.  A
+     // deliberate abort is required here; returning an error would not test
+     // the backend's crash/reopen behavior.
+@@ -2876,6 +2891,7 @@ async fn rp2d_crash_import_worker() {
+ }
+ 
+ async fn rp2d_live_import_rejected_worker() {
++    let _events = start_events("rp2d-live-import-rejected", "AUTHORITY_INVALID", true);
+     let fixture = make_fixture();
+     let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
+     let peers = fixture.chain.create_peers();
+@@ -2912,6 +2928,7 @@ async fn rp2d_live_import_rejected_worker() {
+ }
+ 
+ async fn rp2d_artifact_lifecycle_worker() {
++    let _events = start_events("rp2d-artifact-lifecycle", "GENUINELY_NOT_REQUESTED", true);
+     let fixture = make_fixture();
+     let mode = rp2d_required_env("RP2D_MODE");
+     let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
+@@ -2955,6 +2972,7 @@ async fn rp2d_artifact_lifecycle_worker() {
+ }
+ 
+ async fn rp2d_simultaneous_import_worker() {
++    let _events = start_events("rp2d-simultaneous-import", "GENUINELY_NOT_REQUESTED", true);
+     let fixture = make_fixture();
+     let artifact_path = PathBuf::from(rp2d_required_env("RP2C_ARTIFACT"));
+     let peers = fixture.chain.create_peers();
+@@ -3035,6 +3053,10 @@ fn rp2d_reopen_worker() {
+         "OLD_COMPLETE"
+     } else if expected == "NEW_COMPLETE" && a_registered && a1_present && b_registered && a_type_registered {
+         "NEW_COMPLETE"
++    } else if expected == "ANY" && !a_registered && b_registered && a_type_registered {
++        "OLD_COMPLETE"
++    } else if expected == "ANY" && a_registered && a1_present && b_registered && a_type_registered {
++        "NEW_COMPLETE"
+     } else {
+         "TORN_INVALID"
+     };

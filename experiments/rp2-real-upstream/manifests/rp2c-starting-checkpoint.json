@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "experiment": "D2-RP2C",
+  "captured_utc": "2026-08-31T05:42:56Z",
+  "project_commit": "f0117229a6cb684c76bb46b32a40b80ae7c39ff4",
+  "project_status": "expected RP2 experiment artifacts uncommitted; no unrelated files",
+  "upstream_revision": "12e29522ab7e078ada704d4ac04cbc0498009b7b",
+  "accepted_patch_sha256": {
+    "0002-rp2b-typed-script-handoff.patch": "D811E5F6E1941A262884DFE2D2C2013216D8BCFB22AB3AD05B30D5AAD08C4F5F",
+    "0003-rp2b-spendable-fixture.patch": "23C933F7FBC7969A136D467279D1EFBED222566DD51C879613ABC70974591607"
+  },
+  "accepted_gate_rerun": {
+    "rocksdb": {"rp2a": "7 passed", "rp2b": "3 passed", "verifier": "passed"},
+    "sqlite": {"rp2a": "7 passed", "rp2b": "3 passed", "verifier": "passed"}
+  },
+  "scope": "starting checkpoint before any RP2-C transport changes"
+}
