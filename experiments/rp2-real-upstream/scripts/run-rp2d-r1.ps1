@@ -128,6 +128,7 @@ try {
     # commit_enter marker immediately before the native backend call and
     # commit_exit only after it returns.  The parent never writes the DB.
     $commitRows = @()
+    $unqualifiedCommitAttempts = @()
     $commitAttemptCounts = @{}
     foreach ($backend in @('rocksdb','sqlite')) {
         $sourceName = if ($backend -eq 'rocksdb') { 'c2-sqlite-to-rocksdb-source' } else { 'c1-rocksdb-to-sqlite-source' }
@@ -166,6 +167,7 @@ try {
                 try { $p.Kill(); $killIssued = $true } catch { $killIssued = $false }
             }
             $p.WaitForExit(); $crashExit = $p.ExitCode
+            $signalText = if (Test-Path -LiteralPath $signal) { Get-Content -LiteralPath $signal -Raw } else { '' }
             # A commit can finish before the parent reaches Kill().  That is
             # an unqualified timing sample, not a process-kill trial.  Retry
             # the same numbered trial (bounded) so the evidence set contains
@@ -174,12 +176,12 @@ try {
             if (-not $commitAttemptCounts.ContainsKey($attemptKey)) { $commitAttemptCounts[$attemptKey] = 0 }
             if (-not $killIssued -or $crashExit -eq 0) {
                 $commitAttemptCounts[$attemptKey]++
+                $unqualifiedCommitAttempts += [ordered]@{ backend=$backend; trial=$trial; attempt=$commitAttemptCounts[$attemptKey]; crash_exit_code=$crashExit; commit_enter_observed=$entered; commit_exit_observed=($signalText -match '(?m)^commit_exit\s*$') }
                 if ($commitAttemptCounts[$attemptKey] -ge 8) { throw "commit-race could not terminate child for $backend trial $trial" }
                 if (Test-Path -LiteralPath $trialRoot) { Remove-Item -LiteralPath $trialRoot -Recurse -Force }
                 $trial--
                 continue
             }
-            $signalText = if (Test-Path -LiteralPath $signal) { Get-Content -LiteralPath $signal -Raw } else { '' }
             $commitExitObserved = $signalText -match '(?m)^commit_exit\s*$'
             "exit=$crashExit; kill_issued=$killIssued; commit_enter=$entered; commit_exit=$commitExitObserved" | Set-Content -LiteralPath (Join-Path $Logs ($backend + '-commit-' + $trial + '-crash.log')) -Encoding utf8
             $reopenVars = @{
@@ -204,6 +206,8 @@ try {
         }
     }
     $commitRows | ConvertTo-Json -Depth 40 | Set-Content -LiteralPath (Join-Path $Results 'commit-race.json') -Encoding utf8
+    $unqualifiedJson = if ($unqualifiedCommitAttempts.Count -eq 0) { '[]' } else { $unqualifiedCommitAttempts | ConvertTo-Json -Depth 20 }
+    $unqualifiedJson | Set-Content -LiteralPath (Join-Path $Results 'commit-race-unqualified.json') -Encoding utf8
 } finally { Pop-Location }
 
 & python $Verifier --events-dir (Join-Path (Join-Path $ProjectRoot 'experiments\rp2-real-upstream\run-rp2d') 'events') --output (Join-Path $Results 'rp2d-r1-event-verification.json')
@@ -228,7 +232,7 @@ $summary = [ordered]@{
     schema_version=2; experiment='D2-RP2D-R1-final-safety-seam-closure'; captured_utc=(Get-Date).ToUniversalTime().ToString('o'); project_commit=(git -C $ProjectRoot rev-parse HEAD).Trim(); project_worktree_clean=($gitStatus.Count -eq 0); project_worktree_status=$gitStatus; upstream_revision=$Pinned; toolchain='stable / Rust 1.96.0'; cargo_lock_sha256=(Get-FileHash -Algorithm SHA256 -LiteralPath $cargoLock).Hash; patch_sha256=$patchHashes
     lifecycle_guard_type='test-only shared ImportLifecycle with RAII protocol activity and offline import guards'; offline_exclusive_enforced=$safetyPass
     artifact_model='owned immutable decoded TypedScriptHandoff object'; artifact_remove_after_validation_tested=($safety | Where-Object mode -eq 'artifact-remove').Count -eq 2; artifact_replacement_after_validation_tested=($safety | Where-Object mode -eq 'artifact-replace').Count -eq 2
-    simultaneous_imports_tested=($safety | Where-Object mode -eq 'simultaneous').Count -eq 2; safety_evidence=$safety; commit_race=$commitRows; commit_race_pass=$commitPass; consistency_verifier=$consistency
+    simultaneous_imports_tested=($safety | Where-Object mode -eq 'simultaneous').Count -eq 2; safety_evidence=$safety; commit_race=$commitRows; commit_race_unqualified_attempts=$unqualifiedCommitAttempts; commit_race_pass=$commitPass; consistency_verifier=$consistency
     reorg_regression='reproduced by unchanged run-rp2d.ps1'; authority_unchanged_during_import=$safetyPass; handoff_seam_changed=$false
     verdict=$verdict
 }
