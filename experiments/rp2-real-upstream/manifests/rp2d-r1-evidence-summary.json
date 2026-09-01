@@ -2,12 +2,9 @@
     "schema_version":  2,
     "experiment":  "D2-RP2D-R1-final-safety-seam-closure",
     "captured_utc":  "2026-09-01T04:54:17.2799556Z",
-    "project_commit":  "194deb483394acb4e9a0ecc88329ae5db6c3cddc",
-    "project_worktree_clean":  false,
-    "project_worktree_status":  [
-                                    " M experiments/rp2-real-upstream/manifests/rp2d-r1-evidence-summary.json",
-                                    " M experiments/rp2-real-upstream/scripts/run-rp2d-r1.ps1"
-                                ],
+    "project_commit":  "ed896ef2c6cf7ddb51a6b289c49d47cff2ed0476",
+    "project_worktree_clean":  true,
+    "project_worktree_status":  [],
     "upstream_revision":  "12e29522ab7e078ada704d4ac04cbc0498009b7b",
     "toolchain":  "stable / Rust 1.96.0",
     "cargo_lock_sha256":  "F3A18D999A89519024B44B702C1637C571217CEB8D06CD7E39126E8D22EAE890",
