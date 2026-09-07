@@ -547,6 +547,92 @@ mod tests {
     }
 
     #[test]
+    fn rejects_truncation_trailing_bytes_and_oversized_sections() {
+        let limits = ResourceLimits::default();
+        let bytes = sample().encode(&limits).unwrap();
+
+        let truncated = &bytes[..bytes.len() - 1];
+        assert!(matches!(
+            Artifact::decode(truncated, &limits),
+            Err(D2Error::MalformedArtifact(_))
+        ));
+
+        let mut trailing_body = bytes[..bytes.len() - DIGEST_BYTES].to_vec();
+        trailing_body.push(0xff);
+        let trailing_digest = blake2b_256(&trailing_body);
+        trailing_body.extend_from_slice(&trailing_digest);
+        assert!(matches!(
+            Artifact::decode(&trailing_body, &limits),
+            Err(D2Error::MalformedArtifact(_))
+        ));
+
+        let bounded = ResourceLimits {
+            max_rows_per_section: 0,
+            ..limits
+        };
+        assert!(matches!(
+            Artifact::decode(&bytes, &bounded),
+            Err(D2Error::ResourceLimit(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_decoded_unknown_version_duplicate_rows_and_resource_overflow() {
+        let limits = ResourceLimits::default();
+        let bytes = sample().encode(&limits).unwrap();
+
+        let mut unknown_version = bytes[..bytes.len() - DIGEST_BYTES].to_vec();
+        unknown_version[8..12].copy_from_slice(&99u32.to_le_bytes());
+        let digest = blake2b_256(&unknown_version);
+        unknown_version.extend_from_slice(&digest);
+        assert!(matches!(
+            Artifact::decode(&unknown_version, &limits),
+            Err(D2Error::UnsupportedFormat(99))
+        ));
+
+        let body_end = bytes.len() - DIGEST_BYTES;
+        let index_count_offset = 8
+            + 4
+            + 4
+            + sample().adapter_profile.len()
+            + 32
+            + 4
+            + sample().script.len()
+            + 1
+            + 8
+            + 32
+            + 8;
+        let first_index_row_end = index_count_offset + 4 + 4 + 1 + 4 + 32;
+        let mut duplicate_bytes = bytes[..body_end].to_vec();
+        duplicate_bytes[index_count_offset..index_count_offset + 4]
+            .copy_from_slice(&2u32.to_le_bytes());
+        let first_row = duplicate_bytes[index_count_offset + 4..first_index_row_end].to_vec();
+        duplicate_bytes.splice(first_index_row_end..first_index_row_end, first_row);
+        let digest = blake2b_256(&duplicate_bytes);
+        duplicate_bytes.extend_from_slice(&digest);
+        assert!(matches!(
+            Artifact::decode(&duplicate_bytes, &limits),
+            Err(D2Error::MalformedArtifact(_))
+        ));
+
+        let mut duplicate = sample();
+        duplicate.index_rows.push(duplicate.index_rows[0].clone());
+        assert!(matches!(
+            duplicate.validate(&limits),
+            Err(D2Error::MalformedArtifact(_))
+        ));
+
+        let bounded = ResourceLimits {
+            max_artifact_bytes: bytes.len() - 1,
+            ..limits
+        };
+        assert!(matches!(
+            Artifact::decode(&bytes, &bounded),
+            Err(D2Error::ResourceLimit(_))
+        ));
+    }
+
+    #[test]
     fn rejects_noncanonical_rows_and_unknown_version() {
         let limits = ResourceLimits::default();
         let mut artifact = sample();

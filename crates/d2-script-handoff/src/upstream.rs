@@ -4,6 +4,9 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use ckb_light_client_lib::storage::{
     BatchWriter, Key, KeyPrefix, LightClientStorage, ScriptType, StorageBackend,
 };
@@ -36,20 +39,36 @@ struct LifecycleState {
 struct Lifecycle {
     state: Mutex<LifecycleState>,
     lock_path: PathBuf,
+    #[cfg(test)]
+    fail_next_commit: AtomicBool,
 }
 
 static LIFECYCLES: OnceLock<Mutex<HashMap<PathBuf, Arc<Lifecycle>>>> = OnceLock::new();
 
 fn lifecycle_for(path: &Path) -> Arc<Lifecycle> {
-    let path = path.to_path_buf();
+    let path = storage_identity_path(path);
     let map = LIFECYCLES.get_or_init(|| Mutex::new(HashMap::new()));
     let mut map = map.lock().expect("D2 lifecycle map is not poisoned");
     Arc::clone(map.entry(path.clone()).or_insert_with(|| {
         Arc::new(Lifecycle {
             state: Mutex::new(LifecycleState::default()),
             lock_path: path.with_extension("d2.lock"),
+            #[cfg(test)]
+            fail_next_commit: AtomicBool::new(false),
         })
     }))
+}
+
+fn storage_identity_path(path: &Path) -> PathBuf {
+    #[cfg(feature = "sqlite")]
+    let database_path = if path.is_dir() {
+        path.join("db.sqlite")
+    } else {
+        path.to_path_buf()
+    };
+    #[cfg(not(feature = "sqlite"))]
+    let database_path = path.to_path_buf();
+    std::fs::canonicalize(&database_path).unwrap_or(database_path)
 }
 
 /// An RAII guard that marks protocol workers active for a destination path.
@@ -152,6 +171,13 @@ where
         })?;
         Ok(ExclusiveGuard { file })
     }
+
+    #[cfg(test)]
+    fn fail_next_commit_for_test(&self) {
+        self.lifecycle
+            .fail_next_commit
+            .store(true, Ordering::SeqCst);
+    }
 }
 
 impl<S> StorageAdapter for UpstreamAdapter<S>
@@ -218,6 +244,11 @@ where
 
     fn validate_destination(&self, artifact: &Artifact, limits: &ResourceLimits) -> Result<bool> {
         let _ = limits;
+        if artifact.adapter_profile != UPSTREAM_PROFILE {
+            return Err(D2Error::UnsupportedProfile(
+                artifact.adapter_profile.clone(),
+            ));
+        }
         validate_upstream_rows(artifact)?;
         let existing = exact_status(self.storage.as_ref(), &artifact.script, artifact.role)?;
         if let Some(status) = existing {
@@ -239,10 +270,15 @@ where
     ) -> Result<ImportResult> {
         let _exclusive = self.acquire_exclusive()?;
         artifact.validate(limits)?;
+        if artifact.adapter_profile != UPSTREAM_PROFILE {
+            return Err(D2Error::UnsupportedProfile(
+                artifact.adapter_profile.clone(),
+            ));
+        }
+        validate_authority_against_storage(self.storage.as_ref(), artifact)?;
         validate_upstream_rows(artifact)?;
         let already_present = self.validate_destination(artifact, limits)?;
         let mut batch = self.storage.batch();
-        let mut put_count = 0usize;
         for row in artifact
             .index_rows
             .iter()
@@ -251,7 +287,6 @@ where
         {
             if backend_get(self.storage.as_ref(), row.key.clone())?.is_none() {
                 batch.put(&row.key, &row.value);
-                put_count += 1;
             }
         }
         let script = packed::Script::from_slice(&artifact.script).map_err(|error| {
@@ -261,7 +296,6 @@ where
         let current = exact_status(self.storage.as_ref(), &artifact.script, artifact.role)?;
         if current != Some(artifact.cursor) {
             batch.put(&script_key, &artifact.cursor.to_be_bytes());
-            put_count += 1;
         }
         let min = self
             .storage
@@ -282,10 +316,20 @@ where
             &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
             &min.to_le_bytes(),
         );
+        #[cfg(test)]
+        if self
+            .lifecycle
+            .fail_next_commit
+            .swap(false, Ordering::SeqCst)
+        {
+            return Err(D2Error::Storage(
+                "injected failure before native batch commit".into(),
+            ));
+        }
         batch
             .commit()
             .map_err(|error| D2Error::Storage(format!("native batch commit failed: {error:?}")))?;
-        let _ = put_count;
+        verify_imported_state(self.storage.as_ref(), artifact)?;
         Ok(ImportResult {
             script: artifact.script.clone(),
             role: artifact.role,
@@ -298,6 +342,56 @@ where
             idempotent: already_present,
         })
     }
+}
+
+fn verify_imported_state<S>(storage: &S, artifact: &Artifact) -> Result<()>
+where
+    S: StorageBackend + LightClientStorage,
+{
+    for row in artifact
+        .index_rows
+        .iter()
+        .chain(artifact.transaction_index_rows.iter())
+        .chain(artifact.transaction_rows.iter())
+    {
+        if backend_get(storage, row.key.clone())?.as_deref() != Some(row.value.as_slice()) {
+            return Err(D2Error::Storage(
+                "committed artifact row failed post-commit verification".into(),
+            ));
+        }
+    }
+    if exact_status(storage, &artifact.script, artifact.role)? != Some(artifact.cursor) {
+        return Err(D2Error::Storage(
+            "committed Script cursor failed post-commit verification".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_authority_against_storage<S>(storage: &S, artifact: &Artifact) -> Result<()>
+where
+    S: StorageBackend,
+{
+    let genesis_hash = read_genesis_hash(storage)?;
+    if artifact.genesis_hash != genesis_hash {
+        return Err(D2Error::ChainGenesisMismatch(
+            "artifact genesis differs from destination authority".into(),
+        ));
+    }
+    let handoff_hash = read_block_hash(storage, artifact.handoff_height)?;
+    if artifact.handoff_hash != handoff_hash {
+        return Err(D2Error::HandoffMismatch(
+            "artifact handoff hash differs from destination authority".into(),
+        ));
+    }
+    let tip_height = read_tip_height(storage)?;
+    if artifact.handoff_height > tip_height {
+        return Err(D2Error::HandoffMismatch(format!(
+            "handoff height {} exceeds destination tip {}",
+            artifact.handoff_height, tip_height
+        )));
+    }
+    Ok(())
 }
 
 fn open_lock_file(path: &Path) -> Result<File> {
@@ -402,8 +496,13 @@ where
         ckb_light_client_lib::storage::IteratorDirection::Forward,
         Box::new(move |key| key.starts_with(&take)),
         Box::new(|_key, value| Some(value.to_vec())),
-        limit,
+        limit.saturating_add(1),
     );
+    if rows.len() > limit {
+        return Err(D2Error::ResourceLimit(format!(
+            "Script index rows exceed limit {limit}"
+        )));
+    }
     let mut output = rows
         .into_iter()
         .map(|row| Row {
@@ -575,6 +674,14 @@ mod tests {
     use tempfile::tempdir;
 
     fn fixture_storage(path: &Path, include_script_state: bool) -> (Storage, Vec<u8>) {
+        fixture_storage_at(path, include_script_state, 0)
+    }
+
+    fn fixture_storage_at(
+        path: &Path,
+        include_script_state: bool,
+        handoff_height: u64,
+    ) -> (Storage, Vec<u8>) {
         let storage = Storage::new(path);
         let header = packed::Header::new_builder()
             .raw(packed::RawHeader::new_builder().number(0u64).build())
@@ -585,27 +692,63 @@ mod tests {
         let script = packed::Script::new_builder()
             .code_hash(packed::Byte32::from_slice(&[7u8; 32]).unwrap())
             .build();
+        if handoff_height != 0 {
+            let handoff_header = packed::Header::new_builder()
+                .raw(
+                    packed::RawHeader::new_builder()
+                        .number(handoff_height)
+                        .build(),
+                )
+                .build();
+            let handoff_hash = handoff_header.calc_header_hash();
+            let mut last_state = vec![0u8; 32];
+            last_state.extend_from_slice(handoff_header.as_slice());
+            let mut batch = storage.batch();
+            batch.put(
+                &Key::BlockHash(&handoff_hash).into_vec(),
+                handoff_header.as_slice(),
+            );
+            batch.put(
+                &Key::BlockNumber(handoff_height).into_vec(),
+                handoff_hash.as_slice(),
+            );
+            batch.put(
+                &Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec(),
+                &last_state,
+            );
+            batch.commit().unwrap();
+        }
         if include_script_state {
-            let transaction = packed::Transaction::new_builder().build();
+            let output = packed::CellOutput::new_builder()
+                .capacity(100u64)
+                .lock(script.clone())
+                .build();
+            let transaction = packed::Transaction::new_builder()
+                .raw(
+                    packed::RawTransaction::new_builder()
+                        .outputs(vec![output].pack())
+                        .build(),
+                )
+                .build();
             let tx_hash = transaction.calc_tx_hash();
             let mut batch = storage.batch();
             batch.put(
-                &Key::CellLockScript(&script, 0, 0, 0).into_vec(),
+                &Key::CellLockScript(&script, handoff_height, 0, 0).into_vec(),
                 tx_hash.as_slice(),
             );
             batch.put(
-                &Key::TxLockScript(&script, 0, 0, 0, CellType::Output).into_vec(),
+                &Key::TxLockScript(&script, handoff_height, 0, 0, CellType::Output).into_vec(),
                 tx_hash.as_slice(),
             );
-            let tx_value: Vec<u8> = Value::Transaction(0, 0, &transaction).into();
+            let tx_value: Vec<u8> = Value::Transaction(handoff_height, 0, &transaction).into();
             batch.put(&Key::TxHash(&tx_hash).into_vec(), &tx_value);
             let mut registration = Key::Meta("FILTER_SCRIPTS").into_vec();
             registration.extend_from_slice(script.as_slice());
             registration.push(0);
-            batch.put(&registration, &0u64.to_be_bytes());
+            batch.put(&registration, &handoff_height.to_be_bytes());
             batch.put(
                 &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
-                &0u64.to_le_bytes(),
+                &handoff_height.to_le_bytes(),
             );
             batch.commit().unwrap();
         }
@@ -635,5 +778,333 @@ mod tests {
         assert!(!result.idempotent);
         let repeat = destination_d2.import(&exported.bytes).unwrap();
         assert!(repeat.idempotent);
+    }
+
+    #[test]
+    fn production_adapter_reopens_and_preserves_unrelated_state() {
+        let source_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage(source_dir.path(), true);
+        let (destination, _) = fixture_storage(destination_dir.path(), false);
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+
+        let unrelated = packed::Script::new_builder()
+            .code_hash(packed::Byte32::from_slice(&[8u8; 32]).unwrap())
+            .build();
+        let unrelated_key = Key::CellLockScript(&unrelated, 0, 0, 0).into_vec();
+        let unrelated_value = vec![6u8; 32];
+        let mut destination_batch = destination.batch();
+        destination_batch.put(&unrelated_key, &unrelated_value);
+        destination_batch.commit().unwrap();
+
+        let destination_path = destination_dir.path().to_path_buf();
+        {
+            let destination_d2 =
+                crate::D2::new(UpstreamAdapter::new(destination, &destination_path));
+            let result = destination_d2.import(&exported.bytes).unwrap();
+            assert!(!result.idempotent);
+        }
+
+        let reopened = Storage::new(&destination_path);
+        assert_eq!(
+            backend_get(&reopened, unrelated_key).unwrap(),
+            Some(unrelated_value)
+        );
+        let reopened_d2 = crate::D2::new(UpstreamAdapter::new(reopened, &destination_path));
+        assert!(reopened_d2.validate(&exported.bytes).unwrap().idempotent);
+    }
+
+    #[test]
+    fn production_adapter_failed_precommit_reopens_coherent_and_retries() {
+        let source_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage(source_dir.path(), true);
+        let (destination, _) = fixture_storage(destination_dir.path(), false);
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+        let destination_path = destination_dir.path().to_path_buf();
+        let destination_adapter = UpstreamAdapter::new(destination, &destination_path);
+        destination_adapter.fail_next_commit_for_test();
+
+        let destination_d2 = crate::D2::new(destination_adapter);
+        assert!(matches!(
+            destination_d2.import(&exported.bytes),
+            Err(D2Error::Storage(_))
+        ));
+        drop(destination_d2);
+
+        let reopened = Storage::new(&destination_path);
+        assert!(
+            backend_get(&reopened, exported.artifact.index_rows[0].key.clone())
+                .unwrap()
+                .is_none()
+        );
+        let reopened_d2 = crate::D2::new(UpstreamAdapter::new(reopened, &destination_path));
+        assert!(!reopened_d2.validate(&exported.bytes).unwrap().idempotent);
+        let retry = reopened_d2.import(&exported.bytes).unwrap();
+        assert!(!retry.idempotent);
+    }
+
+    #[test]
+    fn production_adapter_rejects_identity_authority_and_row_conflicts() {
+        let source_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage(source_dir.path(), true);
+        let (destination, _) = fixture_storage(destination_dir.path(), false);
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+
+        let destination_d2 =
+            crate::D2::new(UpstreamAdapter::new(destination, destination_dir.path()));
+
+        let mut wrong_genesis = exported.artifact.clone();
+        wrong_genesis.genesis_hash[0] ^= 1;
+        assert!(matches!(
+            destination_d2.import(&wrong_genesis.encode(&ResourceLimits::default()).unwrap()),
+            Err(D2Error::ChainGenesisMismatch(_))
+        ));
+
+        let mut wrong_handoff = exported.artifact.clone();
+        wrong_handoff.handoff_hash[0] ^= 1;
+        assert!(matches!(
+            destination_d2.import(&wrong_handoff.encode(&ResourceLimits::default()).unwrap()),
+            Err(D2Error::HandoffMismatch(_))
+        ));
+
+        let mut wrong_script = exported.artifact.clone();
+        wrong_script.script = packed::Script::new_builder()
+            .code_hash(packed::Byte32::from_slice(&[8u8; 32]).unwrap())
+            .build()
+            .as_slice()
+            .to_vec();
+        assert!(destination_d2
+            .import(&wrong_script.encode(&ResourceLimits::default()).unwrap())
+            .is_err());
+
+        let mut wrong_role = exported.artifact.clone();
+        wrong_role.role = ScriptRole::Type;
+        assert!(destination_d2
+            .import(&wrong_role.encode(&ResourceLimits::default()).unwrap())
+            .is_err());
+
+        let conflict_dir = tempdir().unwrap();
+        let (conflict_storage, _) = fixture_storage(conflict_dir.path(), false);
+        let mut conflict_batch = conflict_storage.batch();
+        conflict_batch.put(&exported.artifact.index_rows[0].key, &[6u8; 32]);
+        conflict_batch.commit().unwrap();
+        let conflict_d2 =
+            crate::D2::new(UpstreamAdapter::new(conflict_storage, conflict_dir.path()));
+        assert!(matches!(
+            conflict_d2.import(&exported.bytes),
+            Err(D2Error::DestinationConflict(_))
+        ));
+
+        let stale_dir = tempdir().unwrap();
+        let (stale_storage, _) = fixture_storage(stale_dir.path(), false);
+        let stale_key = filter_script_key(
+            &packed::Script::from_slice(&script).unwrap(),
+            ScriptRole::Lock,
+        );
+        let mut stale_batch = stale_storage.batch();
+        stale_batch.put(&stale_key, &1u64.to_be_bytes());
+        stale_batch.commit().unwrap();
+        let stale_d2 = crate::D2::new(UpstreamAdapter::new(stale_storage, stale_dir.path()));
+        assert!(matches!(
+            stale_d2.import(&exported.bytes),
+            Err(D2Error::StaleState(_))
+        ));
+    }
+
+    #[test]
+    fn production_export_rejects_missing_transaction_closure() {
+        let source_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage(source_dir.path(), true);
+        let cell_key =
+            Key::CellLockScript(&packed::Script::from_slice(&script).unwrap(), 0, 0, 0).into_vec();
+        let tx_hash = backend_get(&source, cell_key).unwrap().unwrap();
+        let tx_hash = packed::Byte32::from_slice(&tx_hash).unwrap();
+        let mut batch = source.batch();
+        batch.delete(&Key::TxHash(&tx_hash).into_vec());
+        batch.commit().unwrap();
+
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        assert!(matches!(
+            source_d2.export(&script, ScriptRole::Lock),
+            Err(D2Error::ClosureFailure(_))
+        ));
+    }
+
+    #[test]
+    fn production_adapter_enforces_activity_and_exclusive_lifecycle() {
+        let source_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage(source_dir.path(), true);
+        let (destination, _) = fixture_storage(destination_dir.path(), false);
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+        let destination_adapter = UpstreamAdapter::new(destination, destination_dir.path());
+        let destination_d2 = crate::D2::new(destination_adapter.clone());
+
+        let activity = destination_adapter.acquire_protocol_activity().unwrap();
+        assert!(matches!(
+            destination_d2.import(&exported.bytes),
+            Err(D2Error::Lifecycle(_))
+        ));
+        drop(activity);
+
+        let exclusive = destination_adapter.acquire_exclusive().unwrap();
+        let contender_adapter = destination_adapter.clone();
+        let contender_bytes = exported.bytes.clone();
+        let contender =
+            std::thread::spawn(move || crate::D2::new(contender_adapter).import(&contender_bytes));
+        assert!(matches!(
+            contender.join().unwrap(),
+            Err(D2Error::Lifecycle(_))
+        ));
+        drop(exclusive);
+
+        #[cfg(feature = "sqlite")]
+        {
+            let alternate_path = destination_dir.path().join("db.sqlite");
+            let alternate_storage = Storage::new(&alternate_path);
+            let alternate_adapter = UpstreamAdapter::new(alternate_storage, &alternate_path);
+            let exclusive = destination_adapter.acquire_exclusive().unwrap();
+            assert!(matches!(
+                alternate_adapter.acquire_exclusive(),
+                Err(D2Error::Lifecycle(_))
+            ));
+            drop(exclusive);
+        }
+
+        assert!(!destination_d2.import(&exported.bytes).unwrap().idempotent);
+    }
+
+    #[test]
+    fn production_adapter_reorg_remains_destination_owned() {
+        let source_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source, script) = fixture_storage_at(source_dir.path(), true, 1);
+        let (destination, _) = fixture_storage_at(destination_dir.path(), false, 1);
+        let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+        let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+        let original_hash = exported.artifact.index_rows[0].value.clone();
+        let destination_adapter = UpstreamAdapter::new(destination, destination_dir.path());
+        let destination_d2 = crate::D2::new(destination_adapter.clone());
+        destination_d2.import(&exported.bytes).unwrap();
+
+        let post_h_output = packed::CellOutput::new_builder()
+            .capacity(102u64)
+            .lock(packed::Script::from_slice(&script).unwrap())
+            .build();
+        let post_h_tx = packed::Transaction::new_builder()
+            .raw(
+                packed::RawTransaction::new_builder()
+                    .outputs(vec![post_h_output].pack())
+                    .build(),
+            )
+            .build();
+        let post_h_header = packed::Header::new_builder()
+            .raw(packed::RawHeader::new_builder().number(2u64).build())
+            .build();
+        let post_h_block = packed::Block::new_builder()
+            .header(post_h_header)
+            .transactions(vec![post_h_tx].pack())
+            .build();
+        destination_adapter.storage().filter_block(post_h_block);
+        destination_adapter.storage().update_block_number(2);
+        assert_eq!(
+            exact_status(destination_adapter.storage(), &script, ScriptRole::Lock).unwrap(),
+            Some(2)
+        );
+
+        destination_adapter.storage().rollback_to_block(1);
+        assert!(backend_get(
+            destination_adapter.storage(),
+            exported.artifact.index_rows[0].key.clone()
+        )
+        .unwrap()
+        .is_none());
+
+        let replacement_output = packed::CellOutput::new_builder()
+            .capacity(101u64)
+            .lock(packed::Script::from_slice(&script).unwrap())
+            .build();
+        let replacement_tx = packed::Transaction::new_builder()
+            .raw(
+                packed::RawTransaction::new_builder()
+                    .outputs(vec![replacement_output].pack())
+                    .build(),
+            )
+            .build();
+        let replacement_header = packed::Header::new_builder()
+            .raw(packed::RawHeader::new_builder().number(1u64).build())
+            .build();
+        let replacement_block = packed::Block::new_builder()
+            .header(replacement_header)
+            .transactions(vec![replacement_tx].pack())
+            .build();
+        destination_adapter
+            .storage()
+            .filter_block(replacement_block);
+
+        let replacement_hash = backend_get(
+            destination_adapter.storage(),
+            exported.artifact.index_rows[0].key.clone(),
+        )
+        .unwrap()
+        .unwrap();
+        assert_ne!(replacement_hash, original_hash);
+        assert_eq!(
+            exact_status(destination_adapter.storage(), &script, ScriptRole::Lock).unwrap(),
+            Some(1)
+        );
+    }
+
+    #[test]
+    #[ignore = "requires explicit cross-backend exchange environment"]
+    fn production_adapter_cross_backend_exchange() {
+        let mode = std::env::var("D2_G1_EXCHANGE_MODE").expect("exchange mode");
+        let artifact_path =
+            std::env::var("D2_G1_EXCHANGE_ARTIFACT").expect("exchange artifact path");
+        let path = PathBuf::from(artifact_path);
+        if mode == "export" {
+            let source_dir = tempdir().unwrap();
+            let (source, script) = fixture_storage(source_dir.path(), true);
+            let source_d2 = crate::D2::new(UpstreamAdapter::new(source, source_dir.path()));
+            let exported = source_d2.export(&script, ScriptRole::Lock).unwrap();
+            std::fs::write(path, exported.bytes).unwrap();
+        } else if mode == "import" {
+            let destination_dir = tempdir().unwrap();
+            let (destination, script) = fixture_storage(destination_dir.path(), false);
+            let destination_d2 =
+                crate::D2::new(UpstreamAdapter::new(destination, destination_dir.path()));
+            let bytes = std::fs::read(path).unwrap();
+            let inspection = destination_d2.inspect(&bytes).unwrap();
+            assert_eq!(inspection.script, script);
+            let result = destination_d2.import(&bytes).unwrap();
+            assert!(!result.idempotent);
+            for row in exported_rows(&bytes) {
+                assert_eq!(
+                    backend_get(destination_d2.adapter().storage(), row.key).unwrap(),
+                    Some(row.value)
+                );
+            }
+            assert!(destination_d2.import(&bytes).unwrap().idempotent);
+        } else {
+            panic!("unsupported exchange mode {mode}");
+        }
+    }
+
+    fn exported_rows(bytes: &[u8]) -> Vec<Row> {
+        let artifact = Artifact::decode(bytes, &ResourceLimits::default())
+            .unwrap()
+            .0;
+        artifact
+            .index_rows
+            .into_iter()
+            .chain(artifact.transaction_index_rows)
+            .chain(artifact.transaction_rows)
+            .collect()
     }
 }
