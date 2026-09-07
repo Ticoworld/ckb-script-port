@@ -1,0 +1,21 @@
+[package]
+name = "d2-script-handoff"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+description = "Trusted-source exact-Script derived-state handoff for CKB light-client storage"
+
+[features]
+default = ["rocksdb"]
+rocksdb = ["ckb-light-client-lib/rocksdb"]
+sqlite = ["ckb-light-client-lib/sqlite"]
+
+[dependencies]
+ckb-hash = "1.0.0"
+ckb-light-client-lib = { git = "https://github.com/nervosnetwork/ckb-light-client.git", rev = "12e29522ab7e078ada704d4ac04cbc0498009b7b", default-features = false }
+ckb-types = "1.0.0"
+fs2 = "0.4.3"
+thiserror = "1.0.69"
+
+[dev-dependencies]
+tempfile = "3.0"
