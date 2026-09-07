@@ -297,21 +297,19 @@ where
         if current != Some(artifact.cursor) {
             batch.put(&script_key, &artifact.cursor.to_be_bytes());
         }
+        let imported_script_type = role_to_script_type(artifact.role);
         let min = self
             .storage
             .get_filter_scripts()
             .into_iter()
-            .map(|status| {
-                if status.script.as_slice() == artifact.script.as_slice()
-                    && status.script_type == role_to_script_type(artifact.role)
-                {
-                    artifact.cursor
-                } else {
-                    status.block_number
-                }
+            .filter(|status| {
+                !(status.script.as_slice() == artifact.script.as_slice()
+                    && status.script_type == imported_script_type)
             })
+            .map(|status| status.block_number)
+            .chain(std::iter::once(artifact.cursor))
             .min()
-            .unwrap_or(artifact.cursor);
+            .expect("imported cursor supplies a non-empty minimum");
         batch.put(
             &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
             &min.to_le_bytes(),
@@ -794,8 +792,14 @@ mod tests {
             .build();
         let unrelated_key = Key::CellLockScript(&unrelated, 0, 0, 0).into_vec();
         let unrelated_value = vec![6u8; 32];
+        let unrelated_registration = filter_script_key(&unrelated, ScriptRole::Lock);
         let mut destination_batch = destination.batch();
         destination_batch.put(&unrelated_key, &unrelated_value);
+        destination_batch.put(&unrelated_registration, &10u64.to_be_bytes());
+        destination_batch.put(
+            &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
+            &10u64.to_le_bytes(),
+        );
         destination_batch.commit().unwrap();
 
         let destination_path = destination_dir.path().to_path_buf();
@@ -810,6 +814,12 @@ mod tests {
         assert_eq!(
             backend_get(&reopened, unrelated_key).unwrap(),
             Some(unrelated_value)
+        );
+        assert_eq!(
+            backend_get(&reopened, Key::Meta("MIN_FILTERED_NUMBER").into_vec())
+                .unwrap()
+                .unwrap(),
+            0u64.to_le_bytes()
         );
         let reopened_d2 = crate::D2::new(UpstreamAdapter::new(reopened, &destination_path));
         assert!(reopened_d2.validate(&exported.bytes).unwrap().idempotent);

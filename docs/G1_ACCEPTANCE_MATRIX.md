@@ -12,7 +12,7 @@ G1 PASS requires every required row to be PASS.
 |---|---|---|---|
 | 1. Production Rust package builds | `cargo check -p d2-script-handoff --offline` and feature test builds | PASS | Rust 1.96; package is a workspace member. |
 | 2. Formatting passes | `cargo fmt --all -- --check` | PASS | |
-| 3. Lint/static checks pass | `cargo clippy -p d2-script-handoff --no-default-features --features sqlite --offline -- -D warnings` | PASS | SQLite lint path verified; default-feature clippy remains a separate native build gate. |
+| 3. Lint/static checks pass | `cargo clippy -p d2-script-handoff --no-default-features --features sqlite --all-targets --offline -- -D warnings`; default-feature equivalent | PASS | Both native feature paths verified with all targets. |
 | 4. Complete test suite passes | SQLite unit/product suite; default-feature suite | PASS | Current default and SQLite suites: 16 passed, 1 ignored, 0 failed. |
 | 5. Deterministic artifact | `artifact::tests::deterministic_round_trip`; cross-backend export runner | PASS | Canonical bytes and digest are stable for identical state. |
 | 6. Unsupported format rejected | `artifact::tests::rejects_decoded_unknown_version...` | PASS | Unknown D2 versions fail closed. |
