@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeSet, HashMap},
+    panic::AssertUnwindSafe,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, OnceLock},
 };
@@ -88,12 +89,14 @@ impl Drop for ProtocolActivityGuard {
 }
 
 struct ExclusiveGuard {
-    file: File,
+    file: Option<File>,
 }
 
 impl Drop for ExclusiveGuard {
     fn drop(&mut self) {
-        let _ = self.file.unlock();
+        if let Some(file) = self.file.as_ref() {
+            let _ = file.unlock();
+        }
     }
 }
 
@@ -103,6 +106,10 @@ impl Drop for ExclusiveGuard {
 pub struct UpstreamAdapter<S> {
     storage: Arc<S>,
     lifecycle: Arc<Lifecycle>,
+    /// A lock acquired before opening native upstream storage.  This is used
+    /// by the process-safe constructor so a competing RocksDB opener is
+    /// rejected by D2 before it reaches the native database lock.
+    preopened_exclusive: Arc<Mutex<Option<File>>>,
 }
 
 impl<S> Clone for UpstreamAdapter<S> {
@@ -110,6 +117,7 @@ impl<S> Clone for UpstreamAdapter<S> {
         Self {
             storage: Arc::clone(&self.storage),
             lifecycle: Arc::clone(&self.lifecycle),
+            preopened_exclusive: Arc::clone(&self.preopened_exclusive),
         }
     }
 }
@@ -123,6 +131,7 @@ where
         Self {
             storage: Arc::new(storage),
             lifecycle: lifecycle_for(path.as_ref()),
+            preopened_exclusive: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -165,11 +174,19 @@ where
                 ));
             }
         }
+        if self
+            .preopened_exclusive
+            .lock()
+            .map_err(|_| D2Error::Lifecycle("lifecycle mutex poisoned".into()))?
+            .is_some()
+        {
+            return Ok(ExclusiveGuard { file: None });
+        }
         let file = open_lock_file(&self.lifecycle.lock_path)?;
         file.try_lock_exclusive().map_err(|error| {
             D2Error::Lifecycle(format!("destination is not exclusively offline: {error}"))
         })?;
-        Ok(ExclusiveGuard { file })
+        Ok(ExclusiveGuard { file: Some(file) })
     }
 
     #[cfg(test)]
@@ -177,6 +194,42 @@ where
         self.lifecycle
             .fail_next_commit
             .store(true, Ordering::SeqCst);
+    }
+}
+
+impl UpstreamAdapter<ckb_light_client_lib::storage::Storage> {
+    /// Opens the supported native upstream storage only after D2 has acquired
+    /// the cross-process exclusive lifecycle lock.  Callers performing an
+    /// import should use this constructor; opening RocksDB first would let a
+    /// competing process fail inside the native engine before D2 can return a
+    /// typed lifecycle error.
+    pub fn open_exclusive(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref();
+        let lifecycle = lifecycle_for(path);
+        {
+            let state = lifecycle
+                .state
+                .lock()
+                .map_err(|_| D2Error::Lifecycle("lifecycle mutex poisoned".into()))?;
+            if state.active_protocol != 0 {
+                return Err(D2Error::Lifecycle(
+                    "destination has active protocol workers".into(),
+                ));
+            }
+        }
+        let file = open_lock_file(&lifecycle.lock_path)?;
+        file.try_lock_exclusive().map_err(|error| {
+            D2Error::Lifecycle(format!("destination is not exclusively offline: {error}"))
+        })?;
+        let storage = std::panic::catch_unwind(AssertUnwindSafe(|| {
+            ckb_light_client_lib::storage::Storage::new(path)
+        }))
+        .map_err(|_| D2Error::Storage("upstream native storage could not be opened".into()))?;
+        Ok(Self {
+            storage: Arc::new(storage),
+            lifecycle,
+            preopened_exclusive: Arc::new(Mutex::new(Some(file))),
+        })
     }
 }
 
@@ -324,6 +377,8 @@ where
                 "injected failure before native batch commit".into(),
             ));
         }
+        #[cfg(test)]
+        pause_before_commit_for_test()?;
         batch
             .commit()
             .map_err(|error| D2Error::Storage(format!("native batch commit failed: {error:?}")))?;
@@ -628,15 +683,43 @@ fn read_block_hash<S>(storage: &S, height: u64) -> Result<[u8; 32]>
 where
     S: StorageBackend,
 {
-    let value = backend_get(storage, Key::BlockNumber(height).into_vec())?.ok_or_else(|| {
+    if let Some(value) = backend_get(storage, Key::BlockNumber(height).into_vec())? {
+        if value.len() != 32 {
+            return Err(D2Error::HandoffMismatch(
+                "stored block hash has invalid length".into(),
+            ));
+        }
+        return Ok(value.try_into().unwrap());
+    }
+
+    // The live pinned light-client proof path may retain the accepted tip in
+    // LAST_STATE without retaining a full BlockNumber index for that height.
+    // A handoff at the destination's current tip can therefore use the
+    // independently stored LAST_STATE header as its authority fact.  This
+    // fallback is deliberately limited to the matching tip height; it does
+    // not make source headers authoritative or reconstruct arbitrary history.
+    let last_state = backend_get(
+        storage,
+        Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec(),
+    )?
+    .ok_or_else(|| {
         D2Error::HandoffMismatch(format!("destination has no block hash at height {height}"))
     })?;
-    if value.len() != 32 {
+    if last_state.len() < 32 + packed::Header::TOTAL_SIZE {
         return Err(D2Error::HandoffMismatch(
-            "stored block hash has invalid length".into(),
+            "stored last state is truncated".into(),
         ));
     }
-    Ok(value.try_into().unwrap())
+    let header = packed::Header::from_slice(&last_state[32..]).map_err(|error| {
+        D2Error::HandoffMismatch(format!("stored last state is invalid: {error:?}"))
+    })?;
+    let header_height: u64 = header.raw().number().unpack();
+    if header_height != height {
+        return Err(D2Error::HandoffMismatch(format!(
+            "destination has no block hash at height {height}"
+        )));
+    }
+    Ok(header.calc_header_hash().as_slice().try_into().unwrap())
 }
 
 fn read_tip_height<S>(storage: &S) -> Result<u64>
@@ -664,12 +747,169 @@ where
         .map_err(|error| D2Error::Storage(format!("upstream read failed: {error:?}")))
 }
 
+#[cfg(test)]
+fn pause_before_commit_for_test() -> Result<()> {
+    let Some(ready_path) = std::env::var_os("D2_TEST_PAUSE_BEFORE_COMMIT") else {
+        return Ok(());
+    };
+    let Some(release_path) = std::env::var_os("D2_TEST_RELEASE_COMMIT") else {
+        return Err(D2Error::Invariant(
+            "D2_TEST_PAUSE_BEFORE_COMMIT requires D2_TEST_RELEASE_COMMIT".into(),
+        ));
+    };
+    std::fs::write(&ready_path, b"prepared\n").map_err(|error| {
+        D2Error::Storage(format!("write test commit-ready marker failed: {error}"))
+    })?;
+    while !std::path::Path::new(&release_path).exists() {
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    Ok(())
+}
+
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
     use ckb_light_client_lib::storage::{BatchWriter, CellType, Storage, Value};
     use ckb_types::packed;
     use tempfile::tempdir;
+
+    fn g1_required_env(name: &str) -> String {
+        std::env::var(name).unwrap_or_else(|_| panic!("missing {name} environment variable"))
+    }
+
+    fn g1_decode_hex(value: &str) -> Vec<u8> {
+        let value = value.strip_prefix("0x").unwrap_or(value);
+        assert!(value.len().is_multiple_of(2), "hex value has odd length");
+        (0..value.len())
+            .step_by(2)
+            .map(|index| u8::from_str_radix(&value[index..index + 2], 16).expect("valid hex"))
+            .collect()
+    }
+
+    fn g1_hex(value: &[u8]) -> String {
+        let mut output = String::from("0x");
+        for byte in value {
+            output.push_str(&format!("{byte:02x}"));
+        }
+        output
+    }
+
+    fn g1_json_string(value: &str) -> String {
+        let mut escaped = String::from("\"");
+        for character in value.chars() {
+            match character {
+                '\\' => escaped.push_str("\\\\"),
+                '"' => escaped.push_str("\\\""),
+                '\n' => escaped.push_str("\\n"),
+                '\r' => escaped.push_str("\\r"),
+                '\t' => escaped.push_str("\\t"),
+                character if character.is_control() => {
+                    escaped.push_str(&format!("\\u{:04x}", character as u32))
+                }
+                character => escaped.push(character),
+            }
+        }
+        escaped.push('"');
+        escaped
+    }
+
+    fn g1_worker_result(value: &str) {
+        let path = std::path::PathBuf::from(g1_required_env("D2_G1_WORKER_RESULT"));
+        std::fs::write(path, value).expect("write worker result");
+    }
+
+    /// Test-only process worker. Every operation below goes through the
+    /// public production D2 facade and the native upstream adapter; the
+    /// worker exists so PowerShell runners can exercise real process
+    /// boundaries without adding a product CLI.
+    #[test]
+    #[ignore = "invoked by G1-R1 process runners"]
+    fn production_g1_external_worker() {
+        let mode = g1_required_env("D2_G1_MODE");
+        if mode == "race-prepare" {
+            let source_path = std::path::PathBuf::from(g1_required_env("D2_G1_SOURCE"));
+            let (source, script) = fixture_storage(&source_path, true);
+            drop(source);
+            let source = Storage::new(&source_path);
+            let exported = crate::D2::new(UpstreamAdapter::new(source, &source_path))
+                .export(&script, ScriptRole::Lock)
+                .expect("prepare race artifact");
+            let destination_path = std::path::PathBuf::from(g1_required_env("D2_G1_STORAGE"));
+            let _destination = fixture_storage(&destination_path, false).0;
+            let artifact_path = std::path::PathBuf::from(g1_required_env("D2_G1_ARTIFACT"));
+            std::fs::write(&artifact_path, &exported.bytes).expect("write race artifact");
+            g1_worker_result(&format!(
+                "{{\"mode\":{},\"profile\":{},\"artifact_bytes\":{},\"handoff_height\":{}}}",
+                g1_json_string(&mode),
+                g1_json_string(UPSTREAM_PROFILE),
+                exported.bytes.len(),
+                exported.artifact.handoff_height,
+            ));
+            return;
+        }
+        let path = std::path::PathBuf::from(g1_required_env("D2_G1_STORAGE"));
+        let adapter = if mode == "import" || mode == "race-import" {
+            match UpstreamAdapter::open_exclusive(&path) {
+                Ok(adapter) => adapter,
+                Err(error) => {
+                    g1_worker_result(&format!(
+                        "{{\"mode\":{},\"process_id\":{},\"outcome\":\"rejected\",\"class\":{},\"error\":{}}}",
+                        g1_json_string(&mode),
+                        std::process::id(),
+                        g1_json_string(&format!("{:?}", error.class())),
+                        g1_json_string(&error.to_string()),
+                    ));
+                    return;
+                }
+            }
+        } else {
+            let storage = Storage::new(&path);
+            UpstreamAdapter::new(storage, &path)
+        };
+        let d2 = crate::D2::new(adapter);
+        match mode.as_str() {
+            "export" => {
+                let script = g1_decode_hex(&g1_required_env("D2_G1_SCRIPT"));
+                let exported = d2
+                    .export(&script, ScriptRole::Lock)
+                    .expect("production D2 export");
+                let artifact_path = std::path::PathBuf::from(g1_required_env("D2_G1_ARTIFACT"));
+                std::fs::write(&artifact_path, &exported.bytes).expect("write D2 artifact");
+                g1_worker_result(&format!(
+                    "{{\"mode\":{},\"profile\":{},\"artifact_bytes\":{},\"handoff_height\":{},\"digest\":{}}}",
+                    g1_json_string(&mode),
+                    g1_json_string(UPSTREAM_PROFILE),
+                    exported.bytes.len(),
+                    exported.artifact.handoff_height,
+                    g1_json_string(&g1_hex(&exported.digest.0)),
+                ));
+            }
+            "import" | "race-import" => {
+                let artifact_path = std::path::PathBuf::from(g1_required_env("D2_G1_ARTIFACT"));
+                let bytes = std::fs::read(&artifact_path).expect("read D2 artifact");
+                let outcome = d2.import(&bytes);
+                let result = match outcome {
+                    Ok(result) => format!(
+                        "{{\"mode\":{},\"process_id\":{},\"outcome\":\"accepted\",\"idempotent\":{},\"handoff_height\":{},\"digest\":{}}}",
+                        g1_json_string(&mode),
+                        std::process::id(),
+                        result.idempotent,
+                        result.handoff_height,
+                        g1_json_string(&g1_hex(&result.digest.0)),
+                    ),
+                    Err(error) => format!(
+                        "{{\"mode\":{},\"process_id\":{},\"outcome\":\"rejected\",\"class\":{},\"error\":{}}}",
+                        g1_json_string(&mode),
+                        std::process::id(),
+                        g1_json_string(&format!("{:?}", error.class())),
+                        g1_json_string(&error.to_string()),
+                    ),
+                };
+                g1_worker_result(&result);
+            }
+            other => panic!("unknown D2_G1_MODE {other}"),
+        }
+    }
 
     fn fixture_storage(path: &Path, include_script_state: bool) -> (Storage, Vec<u8>) {
         fixture_storage_at(path, include_script_state, 0)
