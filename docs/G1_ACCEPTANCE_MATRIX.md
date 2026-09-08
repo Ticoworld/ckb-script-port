@@ -33,11 +33,11 @@ G1 PASS requires every required row to be PASS.
 | 21. SQLite → RocksDB handoff | `scripts/run-g1-cross-backend.ps1` | PASS | Production exporter/importer; real native feature builds. Fixture is bounded. |
 | 22. Restart after successful import | `production_adapter_reopens_and_preserves_unrelated_state` | PASS | Reopens native storage and validates idempotent state. |
 | 23. Rejected import leaves coherent destination | authority/conflict/lifecycle rejection tests | PASS | Rejections occur before the native commit. |
-| 24. Post-H continuation | production reorg/refilter fixture and continuation boundary assertions | HOLD | Direct storage refilter is exercised; full pinned protocol continuation still needs a product-level fixture. |
-| 25. No historical refilter through H in earned fixture | RP2 verifier evidence; production artifact cursor test | HOLD | The production test does not yet instrument the full upstream filter request path. |
-| 26. Shallow reorg case passes | `production_adapter_reorg_remains_destination_owned` | HOLD | Native rollback/re-filter is exercised, but not the complete accepted RP2 fork/convergence fixture. |
+| 24. Post-H continuation | `scripts/run-g1-r1-protocol.ps1`; pinned `tests::rp2_authority_replay::g1_production_protocol_worker` continuation mode; production D2 export/import workers | PASS | H=36; real upstream continuation after reopen observes the post-H exact-Script transaction at block 39. Both RocksDB→SQLite and SQLite→RocksDB pass. |
+| 25. No historical refilter through H in earned fixture | Same protocol runner and pinned upstream request instrumentation, with lower-cursor negative control | PASS | Accepted H=36 has positive request starts `[37]`; the negative control starts `[1]`. This is observed request behavior, not cursor inference. |
+| 26. Shallow reorg case passes | `scripts/run-g1-r1-reorg.ps1`; pinned `g1_production_protocol_worker` reorg and separate `reorg-reopen` modes; production D2 import worker | PASS | H=36, fork point 33, winning tip/progress 38. Real upstream rollback removes old A1 and indexes replacement A2R; a fresh process reopens coherent state. Bounded fixture only; no arbitrary-depth claim. |
 | 27. Offline/exclusive import enforced | protocol activity and exclusive-lock tests | PASS | Enforceable boundary is the D2 lifecycle guard plus OS advisory lock. |
-| 28. Concurrent importer behavior passes | controlled held-exclusive contention test | HOLD | Lock rejection is tested; two independent importer processes with one winner are not yet product-tested. |
+| 28. Concurrent importer behavior passes | `scripts/run-g1-r1-process-race.ps1`; `upstream::tests::production_g1_external_worker` | PASS | 10 independent process races per backend. RocksDB: 10/10; SQLite: 10/10. Each has one accepted winner, one typed retryable lifecycle loser during preparation, and an idempotent post-commit retry. |
 | 29. Source omission is explicit non-detectable limitation | `docs/D2_V1.md` trust/non-claims section and PDEF1 | PASS | D2 does not claim historical completeness. |
 | 30. Documentation matches implementation | `docs/D2_V1.md`, this matrix, source review | PASS | The docs describe the current implemented API and keep unproven lifecycle claims qualified. |
 
@@ -50,5 +50,8 @@ G1 PASS requires every required row to be PASS.
 - **Reused oracle:** RP2 verifier and evidence remain historical evidence for
   the semantic seam only.
 
-The current HOLD rows are not G2 scale work. They are required G1 lifecycle
-evidence gates from PDEF1 and must be resolved before declaring G1 complete.
+The G1-R1 lifecycle evidence is recorded in
+`docs/G1_R1_LIFECYCLE_EVIDENCE.md`. The ignored `_work` roots named there are
+generated evidence directories; the tracked runners recreate the cases. The
+four former HOLD rows are now closed by production D2 export/import paths plus
+real pinned-upstream continuation/reorg processes.
