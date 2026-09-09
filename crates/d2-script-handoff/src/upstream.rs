@@ -911,6 +911,489 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy)]
+    struct G2Workload {
+        name: &'static str,
+        class: &'static str,
+        history_depth: u64,
+        match_stride: u64,
+        transactions_per_match: u32,
+        outputs_per_transaction: u32,
+    }
+
+    fn g2_workload(name: &str) -> G2Workload {
+        match name {
+            "control" => G2Workload {
+                name: "control",
+                class: "CONTROL",
+                history_depth: 36,
+                match_stride: 18,
+                transactions_per_match: 1,
+                outputs_per_transaction: 1,
+            },
+            "realistic-sparse" => G2Workload {
+                name: "realistic-sparse",
+                class: "REALISTIC-SYNTHETIC",
+                history_depth: 10_000,
+                match_stride: 100,
+                transactions_per_match: 1,
+                outputs_per_transaction: 1,
+            },
+            "realistic-moderate" => G2Workload {
+                name: "realistic-moderate",
+                class: "REALISTIC-SYNTHETIC",
+                history_depth: 5_000,
+                match_stride: 10,
+                transactions_per_match: 2,
+                outputs_per_transaction: 4,
+            },
+            "realistic-dense" => G2Workload {
+                name: "realistic-dense",
+                class: "REALISTIC-SYNTHETIC",
+                history_depth: 2_000,
+                match_stride: 1,
+                transactions_per_match: 2,
+                outputs_per_transaction: 4,
+            },
+            "stress-unique" => G2Workload {
+                name: "stress-unique",
+                class: "STRESS",
+                history_depth: 2_500,
+                match_stride: 1,
+                transactions_per_match: 4,
+                outputs_per_transaction: 2,
+            },
+            "stress-shared" => G2Workload {
+                name: "stress-shared",
+                class: "STRESS",
+                history_depth: 2_500,
+                match_stride: 1,
+                transactions_per_match: 1,
+                outputs_per_transaction: 16,
+            },
+            other => panic!("unknown G2 workload {other}"),
+        }
+    }
+
+    fn g2_required_env(name: &str) -> String {
+        std::env::var(name).unwrap_or_else(|_| panic!("missing {name} environment variable"))
+    }
+
+    fn g2_json_array(values: &[u128]) -> String {
+        format!(
+            "[{}]",
+            values
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    }
+
+    fn g2_result(value: &str) {
+        let path = std::path::PathBuf::from(g2_required_env("D2_G2_OUTPUT"));
+        std::fs::write(path, value).expect("write G2 worker result");
+    }
+
+    fn g2_tree_bytes(path: &Path) -> u64 {
+        if path.is_file() {
+            return path.metadata().map(|metadata| metadata.len()).unwrap_or(0);
+        }
+        let Ok(entries) = std::fs::read_dir(path) else {
+            return 0;
+        };
+        entries
+            .filter_map(|entry| entry.ok())
+            .map(|entry| {
+                let path = entry.path();
+                if path.is_dir() {
+                    g2_tree_bytes(&path)
+                } else {
+                    entry.metadata().map(|metadata| metadata.len()).unwrap_or(0)
+                }
+            })
+            .sum()
+    }
+
+    fn g2_script(seed: u8) -> packed::Script {
+        packed::Script::new_builder()
+            .code_hash(packed::Byte32::from_slice(&[seed; 32]).unwrap())
+            .build()
+    }
+
+    fn g2_header(number: u64) -> packed::Header {
+        packed::Header::new_builder()
+            .raw(
+                packed::RawHeader::new_builder()
+                    .number(number)
+                    .timestamp(1_000u64 + number)
+                    .build(),
+            )
+            .build()
+    }
+
+    fn g2_transaction(
+        script: &packed::Script,
+        transaction_number: u64,
+        outputs_per_transaction: u32,
+    ) -> packed::Transaction {
+        let outputs = (0..outputs_per_transaction)
+            .map(|output_index| {
+                packed::CellOutput::new_builder()
+                    .capacity(100 + transaction_number * 32 + output_index as u64)
+                    .lock(script.clone())
+                    .build()
+            })
+            .collect::<Vec<_>>();
+        packed::Transaction::new_builder()
+            .raw(
+                packed::RawTransaction::new_builder()
+                    .outputs(outputs.pack())
+                    .build(),
+            )
+            .build()
+    }
+
+    fn g2_block(number: u64, transactions: Vec<packed::Transaction>) -> packed::Block {
+        packed::Block::new_builder()
+            .header(g2_header(number))
+            .transactions(transactions.pack())
+            .build()
+    }
+
+    fn g2_init_base(path: &Path) -> (Storage, packed::Script) {
+        let storage = Storage::new(path);
+        let genesis = packed::Block::new_builder().header(g2_header(0)).build();
+        storage.init_genesis_block(genesis);
+        (storage, g2_script(7))
+    }
+
+    fn g2_register(storage: &Storage, script: &packed::Script, cursor: u64) {
+        let key = filter_script_key(script, ScriptRole::Lock);
+        let mut batch = storage.batch();
+        batch.put(&key, &cursor.to_be_bytes());
+        batch.put(
+            &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
+            &cursor.to_le_bytes(),
+        );
+        batch.commit().expect("register G2 Script");
+    }
+
+    fn g2_set_authority(storage: &Storage, script: &packed::Script, spec: G2Workload) {
+        let header = g2_header(spec.history_depth);
+        let hash = header.calc_header_hash();
+        let mut last_state = vec![0u8; 32];
+        last_state.extend_from_slice(header.as_slice());
+        let mut batch = storage.batch();
+        batch.put(&Key::BlockHash(&hash).into_vec(), header.as_slice());
+        batch.put(
+            &Key::BlockNumber(spec.history_depth).into_vec(),
+            hash.as_slice(),
+        );
+        batch.put(
+            &Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec(),
+            &last_state,
+        );
+        batch.put(
+            &filter_script_key(script, ScriptRole::Lock),
+            &spec.history_depth.to_be_bytes(),
+        );
+        batch.put(
+            &Key::Meta("MIN_FILTERED_NUMBER").into_vec(),
+            &spec.history_depth.to_le_bytes(),
+        );
+        batch.commit().expect("set G2 authority");
+    }
+
+    fn g2_apply_history(storage: &Storage, script: &packed::Script, spec: G2Workload) {
+        let mut transaction_number = 0u64;
+        for block_number in 1..=spec.history_depth {
+            let transactions = if block_number % spec.match_stride == 0 {
+                (0..spec.transactions_per_match)
+                    .map(|_| {
+                        let transaction = g2_transaction(
+                            script,
+                            transaction_number,
+                            spec.outputs_per_transaction,
+                        );
+                        transaction_number += 1;
+                        transaction
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            storage.filter_block(g2_block(block_number, transactions));
+        }
+        g2_set_authority(storage, script, spec);
+    }
+
+    fn g2_prepare_source(path: &Path, spec: G2Workload) -> (packed::Script, u128) {
+        let started = std::time::Instant::now();
+        let (storage, script) = g2_init_base(path);
+        g2_register(&storage, &script, 0);
+        g2_apply_history(&storage, &script, spec);
+        drop(storage);
+        (script, started.elapsed().as_micros())
+    }
+
+    fn g2_prepare_destination(path: &Path, spec: G2Workload) {
+        let (storage, script) = g2_init_base(path);
+        g2_set_authority(&storage, &script, spec);
+        drop(storage);
+    }
+
+    fn g2_run_rescan(path: &Path, spec: G2Workload) -> (u128, packed::Script) {
+        let started = std::time::Instant::now();
+        let (storage, script) = g2_init_base(path);
+        g2_register(&storage, &script, 0);
+        g2_apply_history(&storage, &script, spec);
+        drop(storage);
+        (started.elapsed().as_micros(), script)
+    }
+
+    /// Test-only G2 scale worker. The generated workloads use the pinned
+    /// upstream native storage profile and call its real filter_block path;
+    /// they are synthetic chain histories, not mainnet data. All handoff
+    /// operations in this worker use the public production D2 facade.
+    #[test]
+    #[ignore = "invoked by G2 scale runners"]
+    fn g2_scale_worker() {
+        let mode = g2_required_env("D2_G2_MODE");
+        let spec = g2_workload(&g2_required_env("D2_G2_WORKLOAD"));
+        let path = std::path::PathBuf::from(g2_required_env("D2_G2_PATH"));
+        let repeats = g2_required_env("D2_G2_REPEATS")
+            .parse::<usize>()
+            .expect("valid G2 repeat count");
+        assert!(repeats > 0 && repeats <= 10, "bounded G2 repeat count");
+
+        match mode.as_str() {
+            "export" => {
+                let (script, preparation_us) = g2_prepare_source(&path, spec);
+                let adapter = UpstreamAdapter::open_exclusive(&path).expect("open G2 source");
+                let d2 = crate::D2::new(adapter);
+                let mut export_us = Vec::with_capacity(repeats);
+                let mut artifact = None;
+                for _ in 0..repeats {
+                    let started = std::time::Instant::now();
+                    let exported = d2
+                        .export(script.as_slice(), ScriptRole::Lock)
+                        .expect("production G2 export");
+                    export_us.push(started.elapsed().as_micros());
+                    artifact = Some(exported);
+                }
+                let exported = artifact.expect("G2 export result");
+                let artifact_path = std::path::PathBuf::from(g2_required_env("D2_G2_ARTIFACT"));
+                std::fs::write(&artifact_path, &exported.bytes).expect("write G2 artifact");
+                g2_result(&format!(
+                    "{{\"mode\":\"export\",\"workload\":\"{}\",\"class\":\"{}\",\"backend\":\"{}\",\"history_depth\":{},\"match_stride\":{},\"expected_matched_blocks\":{},\"expected_index_rows\":{},\"expected_transaction_rows\":{},\"preparation_us\":{},\"export_us\":{},\"source_bytes\":{},\"artifact_bytes\":{},\"row_payload_bytes\":{},\"index_rows\":{},\"transaction_index_rows\":{},\"transaction_rows\":{},\"handoff_height\":{},\"digest\":\"{}\"}}",
+                    spec.name,
+                    spec.class,
+                    if cfg!(feature = "sqlite") { "sqlite" } else { "rocksdb" },
+                    spec.history_depth,
+                    spec.match_stride,
+                    spec.history_depth / spec.match_stride,
+                    exported.artifact.index_rows.len(),
+                    exported.artifact.transaction_rows.len(),
+                    preparation_us,
+                    g2_json_array(&export_us),
+                    g2_tree_bytes(&path),
+                    exported.bytes.len(),
+                    exported.artifact.index_rows.iter().map(|row| row.key.len() + row.value.len()).sum::<usize>()
+                        + exported.artifact.transaction_index_rows.iter().map(|row| row.key.len() + row.value.len()).sum::<usize>()
+                        + exported.artifact.transaction_rows.iter().map(|row| row.key.len() + row.value.len()).sum::<usize>(),
+                    exported.artifact.index_rows.len(),
+                    exported.artifact.transaction_index_rows.len(),
+                    exported.artifact.transaction_rows.len(),
+                    exported.artifact.handoff_height,
+                    g1_hex(&exported.digest.0),
+                ));
+            }
+            "prepare" => {
+                g2_prepare_destination(&path, spec);
+                g2_result(&format!(
+                    "{{\"mode\":\"prepare\",\"workload\":\"{}\",\"backend\":\"{}\",\"destination_bytes\":{}}}",
+                    spec.name,
+                    if cfg!(feature = "sqlite") { "sqlite" } else { "rocksdb" },
+                    g2_tree_bytes(&path),
+                ));
+            }
+            "import" => {
+                let artifact_path = std::path::PathBuf::from(g2_required_env("D2_G2_ARTIFACT"));
+                let bytes = std::fs::read(&artifact_path).expect("read G2 artifact");
+                assert_eq!(
+                    repeats, 1,
+                    "G2 import worker measures one fresh destination"
+                );
+                let adapter = UpstreamAdapter::open_exclusive(&path).expect("open G2 destination");
+                let d2 = crate::D2::new(adapter);
+                let started = std::time::Instant::now();
+                d2.inspect(&bytes).expect("G2 inspect");
+                let inspection_us = started.elapsed().as_micros();
+                let started = std::time::Instant::now();
+                d2.validate(&bytes).expect("G2 validation");
+                let validation_us = started.elapsed().as_micros();
+                let started = std::time::Instant::now();
+                let result = d2.import(&bytes).expect("G2 import");
+                let import_us = started.elapsed().as_micros();
+                drop(d2);
+                let started = std::time::Instant::now();
+                let reopened =
+                    UpstreamAdapter::open_exclusive(&path).expect("reopen G2 destination");
+                let reopened_d2 = crate::D2::new(reopened);
+                reopened_d2.validate(&bytes).expect("reopen validation");
+                let reopen_us = started.elapsed().as_micros();
+                drop(reopened_d2);
+                g2_result(&format!(
+                    "{{\"mode\":\"import\",\"workload\":\"{}\",\"backend\":\"{}\",\"artifact_bytes\":{},\"inspection_us\":{},\"validation_us\":{},\"import_us\":{},\"reopen_us\":{},\"destination_bytes\":{},\"idempotent\":{},\"handoff_height\":{},\"index_rows\":{},\"transaction_index_rows\":{},\"transaction_rows\":{}}}",
+                    spec.name,
+                    if cfg!(feature = "sqlite") { "sqlite" } else { "rocksdb" },
+                    bytes.len(),
+                    inspection_us,
+                    validation_us,
+                    import_us,
+                    reopen_us,
+                    g2_tree_bytes(&path),
+                    result.idempotent,
+                    result.handoff_height,
+                    result.index_rows,
+                    result.transaction_index_rows,
+                    result.transaction_rows,
+                ));
+            }
+            "rescan" => {
+                assert_eq!(
+                    repeats, 1,
+                    "G2 rescan worker measures one fresh destination"
+                );
+                let (rescan_us, script) = g2_run_rescan(&path, spec);
+                g2_result(&format!(
+                    "{{\"mode\":\"rescan\",\"workload\":\"{}\",\"backend\":\"{}\",\"history_depth\":{},\"rescan_us\":{},\"destination_bytes\":{},\"script_bytes\":{}}}",
+                    spec.name,
+                    if cfg!(feature = "sqlite") { "sqlite" } else { "rocksdb" },
+                    spec.history_depth,
+                    rescan_us,
+                    g2_tree_bytes(&path),
+                    script.as_slice().len(),
+                ));
+            }
+            other => panic!("unknown G2 mode {other}"),
+        }
+    }
+
+    /// Test-only G2 measurement worker. It deliberately exposes only timing
+    /// and result data for the production D2 facade; workload construction and
+    /// protocol replay remain in the pinned upstream test worker.
+    #[test]
+    #[ignore = "invoked by G2 realism runners"]
+    fn production_g2_worker() {
+        let mode = g1_required_env("D2_G2_MODE");
+        let path = std::path::PathBuf::from(g1_required_env("D2_G2_STORAGE"));
+        let artifact_path = std::path::PathBuf::from(g1_required_env("D2_G2_ARTIFACT"));
+        let result_path = std::path::PathBuf::from(g1_required_env("D2_G2_RESULT"));
+        let write_result = |value: String| {
+            std::fs::write(&result_path, value).expect("write G2 D2 result");
+        };
+
+        match mode.as_str() {
+            "export" => {
+                let script = g1_decode_hex(&g1_required_env("D2_G2_SCRIPT"));
+                let storage = Storage::new(&path);
+                let d2 = crate::D2::new(UpstreamAdapter::new(storage, &path));
+                let started = std::time::Instant::now();
+                let exported = d2.export(&script, ScriptRole::Lock).expect("G2 D2 export");
+                let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+                std::fs::write(&artifact_path, &exported.bytes).expect("write G2 artifact");
+                let semantic_row_bytes: usize = exported
+                    .artifact
+                    .index_rows
+                    .iter()
+                    .chain(exported.artifact.transaction_index_rows.iter())
+                    .chain(exported.artifact.transaction_rows.iter())
+                    .map(|row| row.key.len() + row.value.len())
+                    .sum();
+                write_result(format!(
+                    "{{\"mode\":\"export\",\"backend\":{},\"elapsed_ms\":{},\"artifact_bytes\":{},\"semantic_row_bytes\":{},\"index_rows\":{},\"transaction_index_rows\":{},\"transaction_rows\":{},\"handoff_height\":{},\"digest\":{}}}",
+                    g1_json_string(if cfg!(feature = "sqlite") { "sqlite" } else { "rocksdb" }),
+                    elapsed_ms,
+                    exported.bytes.len(),
+                    semantic_row_bytes,
+                    exported.artifact.index_rows.len(),
+                    exported.artifact.transaction_index_rows.len(),
+                    exported.artifact.transaction_rows.len(),
+                    exported.artifact.handoff_height,
+                    g1_json_string(&g1_hex(&exported.digest.0)),
+                ));
+            }
+            "inspect" => {
+                let storage = Storage::new(&path);
+                let d2 = crate::D2::new(UpstreamAdapter::new(storage, &path));
+                let bytes = std::fs::read(&artifact_path).expect("read G2 artifact");
+                let started = std::time::Instant::now();
+                let inspection = d2.inspect(&bytes).expect("G2 D2 inspect");
+                let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+                write_result(format!(
+                    "{{\"mode\":\"inspect\",\"elapsed_ms\":{},\"artifact_bytes\":{},\"index_rows\":{},\"transaction_index_rows\":{},\"transaction_rows\":{},\"handoff_height\":{},\"digest\":{}}}",
+                    elapsed_ms,
+                    bytes.len(),
+                    inspection.index_rows,
+                    inspection.transaction_index_rows,
+                    inspection.transaction_rows,
+                    inspection.handoff_height,
+                    g1_json_string(&g1_hex(&inspection.digest.0)),
+                ));
+            }
+            "validate" => {
+                let adapter = UpstreamAdapter::open_exclusive(&path).expect("open G2 validator");
+                let d2 = crate::D2::new(adapter);
+                let bytes = std::fs::read(&artifact_path).expect("read G2 artifact");
+                let started = std::time::Instant::now();
+                let report = d2.validate(&bytes).expect("G2 D2 validate");
+                let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+                write_result(format!(
+                    "{{\"mode\":\"validate\",\"elapsed_ms\":{},\"idempotent\":{},\"handoff_height\":{},\"tip_height\":{}}}",
+                    elapsed_ms,
+                    report.idempotent,
+                    report.artifact.handoff_height,
+                    report.authority.tip_height,
+                ));
+            }
+            "import" => {
+                let adapter = UpstreamAdapter::open_exclusive(&path).expect("open G2 importer");
+                let d2 = crate::D2::new(adapter);
+                let bytes = std::fs::read(&artifact_path).expect("read G2 artifact");
+                let started = std::time::Instant::now();
+                let result = d2.import(&bytes).expect("G2 D2 import");
+                let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+                write_result(format!(
+                    "{{\"mode\":\"import\",\"elapsed_ms\":{},\"idempotent\":{},\"handoff_height\":{},\"index_rows\":{},\"transaction_index_rows\":{},\"transaction_rows\":{},\"digest\":{}}}",
+                    elapsed_ms,
+                    result.idempotent,
+                    result.handoff_height,
+                    result.index_rows,
+                    result.transaction_index_rows,
+                    result.transaction_rows,
+                    g1_json_string(&g1_hex(&result.digest.0)),
+                ));
+            }
+            "reopen" => {
+                let adapter = UpstreamAdapter::open_exclusive(&path).expect("open G2 reopener");
+                let d2 = crate::D2::new(adapter);
+                let bytes = std::fs::read(&artifact_path).expect("read G2 artifact");
+                let started = std::time::Instant::now();
+                let report = d2.validate(&bytes).expect("G2 D2 reopen validation");
+                let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+                write_result(format!(
+                    "{{\"mode\":\"reopen\",\"elapsed_ms\":{},\"idempotent\":{},\"handoff_height\":{}}}",
+                    elapsed_ms,
+                    report.idempotent,
+                    report.artifact.handoff_height,
+                ));
+            }
+            other => panic!("unknown D2_G2_MODE {other}"),
+        }
+    }
+
     fn fixture_storage(path: &Path, include_script_state: bool) -> (Storage, Vec<u8>) {
         fixture_storage_at(path, include_script_state, 0)
     }
@@ -920,6 +1403,15 @@ mod tests {
         include_script_state: bool,
         handoff_height: u64,
     ) -> (Storage, Vec<u8>) {
+        fixture_storage_at_with_seed(path, include_script_state, handoff_height, 7)
+    }
+
+    fn fixture_storage_at_with_seed(
+        path: &Path,
+        include_script_state: bool,
+        handoff_height: u64,
+        script_seed: u8,
+    ) -> (Storage, Vec<u8>) {
         let storage = Storage::new(path);
         let header = packed::Header::new_builder()
             .raw(packed::RawHeader::new_builder().number(0u64).build())
@@ -928,7 +1420,7 @@ mod tests {
         storage.init_genesis_block(genesis);
 
         let script = packed::Script::new_builder()
-            .code_hash(packed::Byte32::from_slice(&[7u8; 32]).unwrap())
+            .code_hash(packed::Byte32::from_slice(&[script_seed; 32]).unwrap())
             .build();
         if handoff_height != 0 {
             let handoff_header = packed::Header::new_builder()
@@ -1016,6 +1508,66 @@ mod tests {
         assert!(!result.idempotent);
         let repeat = destination_d2.import(&exported.bytes).unwrap();
         assert!(repeat.idempotent);
+    }
+
+    #[test]
+    fn production_g2_repeated_independent_script_operations_remain_coherent() {
+        let source_one_dir = tempdir().unwrap();
+        let source_two_dir = tempdir().unwrap();
+        let destination_dir = tempdir().unwrap();
+        let (source_one, script_one) =
+            fixture_storage_at_with_seed(source_one_dir.path(), true, 0, 7);
+        let (source_two, script_two) =
+            fixture_storage_at_with_seed(source_two_dir.path(), true, 0, 8);
+        let (destination, _) = fixture_storage(destination_dir.path(), false);
+
+        let exported_one = crate::D2::new(UpstreamAdapter::new(source_one, source_one_dir.path()))
+            .export(&script_one, ScriptRole::Lock)
+            .unwrap();
+        let exported_two = crate::D2::new(UpstreamAdapter::new(source_two, source_two_dir.path()))
+            .export(&script_two, ScriptRole::Lock)
+            .unwrap();
+
+        let destination_path = destination_dir.path().to_path_buf();
+        let destination_d2 = crate::D2::new(UpstreamAdapter::new(destination, &destination_path));
+        assert!(
+            !destination_d2
+                .import(&exported_one.bytes)
+                .unwrap()
+                .idempotent
+        );
+        assert!(
+            !destination_d2
+                .import(&exported_two.bytes)
+                .unwrap()
+                .idempotent
+        );
+
+        drop(destination_d2);
+        let reopened = Storage::new(&destination_path);
+        let reopened_d2 = crate::D2::new(UpstreamAdapter::new(reopened, &destination_path));
+        assert!(
+            reopened_d2
+                .validate(&exported_one.bytes)
+                .unwrap()
+                .idempotent
+        );
+        assert!(
+            reopened_d2
+                .validate(&exported_two.bytes)
+                .unwrap()
+                .idempotent
+        );
+
+        for row in exported_rows(&exported_one.bytes)
+            .into_iter()
+            .chain(exported_rows(&exported_two.bytes))
+        {
+            assert_eq!(
+                backend_get(reopened_d2.adapter().storage(), row.key).unwrap(),
+                Some(row.value)
+            );
+        }
     }
 
     #[test]
