@@ -1080,6 +1080,7 @@ dependencies = [
  "ckb-light-client-lib",
  "ckb-types",
  "fs2",
+ "rusqlite",
  "tempfile",
  "thiserror 1.0.69",
 ]

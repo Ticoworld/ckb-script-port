@@ -16,6 +16,8 @@ mod artifact;
 mod error;
 mod limits;
 mod operations;
+#[cfg(feature = "pocket-sqlite")]
+mod pocket;
 mod upstream;
 
 pub use artifact::{Artifact, ArtifactDigest, ArtifactInspection, Row, ScriptRole, FORMAT_VERSION};
@@ -24,6 +26,8 @@ pub use limits::ResourceLimits;
 pub use operations::{
     DestinationAuthority, ExportedArtifact, ImportResult, StorageAdapter, ValidationReport, D2,
 };
+#[cfg(feature = "pocket-sqlite")]
+pub use pocket::{PocketSqliteAdapter, POCKET_PROFILE};
 pub use upstream::{ProtocolActivityGuard, UpstreamAdapter, UPSTREAM_PROFILE};
 
 #[cfg(feature = "rocksdb")]

@@ -9,6 +9,7 @@ description = "Trusted-source exact-Script derived-state handoff for CKB light-c
 default = ["rocksdb"]
 rocksdb = ["ckb-light-client-lib/rocksdb"]
 sqlite = ["ckb-light-client-lib/sqlite"]
+pocket-sqlite = ["dep:rusqlite"]
 
 [dependencies]
 ckb-hash = "1.0.0"
@@ -16,6 +17,7 @@ ckb-light-client-lib = { git = "https://github.com/nervosnetwork/ckb-light-clien
 ckb-types = "1.0.0"
 fs2 = "0.4.3"
 thiserror = "1.0.69"
+rusqlite = { version = "0.32.1", features = ["bundled"], optional = true }
 
 [dev-dependencies]
 tempfile = "3.0"

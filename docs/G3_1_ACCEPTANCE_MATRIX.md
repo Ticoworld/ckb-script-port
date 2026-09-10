@@ -1,6 +1,6 @@
 # G3-1 Pocket acceptance matrix
 
-**Date:** 9 September 2026  
+**Date:** 10 September 2026
 **G3-0 checkpoint:** `b86e0a958d50a676c3e062419d4c1194c2b342c3`  
 **G3-1 result:** **HOLD**
 
@@ -32,6 +32,24 @@ substitute for Pocket execution.
 | 20 | Strongest DB-copy/rescan/Pocket-specific alternative assessed | Compared documented rescan, full app/LC copy, Pocket key backup, and hypothetical Pocket serializer in report | HOLD | Source-level comparison only; no equivalent Pocket migration timings or file-copy experiment. |
 | 21 | Product-vs-Pocket-specific-work boundary survives | D2/Pocket ownership map documented; no end-to-end handoff | HOLD | Boundary is plausible but not proven by a reference product flow. |
 | 22 | No D2 scope expansion occurred | `git diff` showed no production D2 change during G3-1; no PV1/multi-Script/signing/cloud changes | PASS | Only evidence docs are added; ignored disposable reference build output is outside the D2 tree. |
+
+## G3-1R1 update (10 September 2026)
+
+G3-1R1 changed the evidence state for the profile/source/export portions of
+the matrix. The original rows above preserve the historical G3-1 starting
+record; the current interpretation is:
+
+| Row | Current result | Current evidence |
+|---:|---|---|
+| 5 | PASS | New explicit `pocket-sqlite` `PocketSqliteAdapter`, profile `pocket-node@6eda0b7.../ckb-light-client@0.5.4/kv-v1`, and production conformance test. |
+| 6 | PASS with zero-closure qualification | Real UI-created wallet and captured 10,215-row Pocket `store.db`; exact 73-byte lock Script registration and H=20,410,406 exist, but selected index/transaction/closure counts are zero. |
+| 7 | HOLD | The initial no-D2 control was not unlocked after staging; Pocket reported `scriptBlock=0`, so filter-hash traffic is not counted as an exact-Script refilter control. |
+| 8 | PASS with zero-closure qualification | Production `D2::export` against the captured Pocket source emitted H=20,410,406 and a 299-byte zero-closure artifact. |
+| 9 | HOLD | Host-side Pocket `kv` import/reopen passed, but no fresh Android Pocket application destination was executed. |
+| 10–21 | HOLD | No Android D2 import, request trace, Room rebuild, post-H exact-Script result, restart-after-import, measurement, or alternative timing was completed. |
+
+The full R1 record is in
+[`G3_1R1_POCKET_EXECUTION_EVIDENCE.md`](G3_1R1_POCKET_EXECUTION_EVIDENCE.md).
 
 ## Commands and observed runtime evidence
 
@@ -91,9 +109,16 @@ was produced.
 | HOLD | 18 |
 | FAIL | 0 |
 
-The four PASS rows are checkpoint/revision/architecture reconstruction,
-Android execution attempt, and scope discipline. They do not satisfy the
-G3-1 PASS rule. The result is therefore **G3-1 HOLD**.
+The original four PASS rows are checkpoint/revision/architecture
+reconstruction, Android execution attempt, and scope discipline. They do not
+satisfy the G3-1 PASS rule. The result was therefore **G3-1 HOLD** at the
+starting checkpoint.
+
+### Current G3-1R1 counts
+
+Counting the R1 updates above as binary requirement results gives **7 PASS / 15
+HOLD / 0 FAIL**. The zero-closure qualifications do not upgrade the missing
+Android lifecycle rows. G3-1R1 therefore remains **HOLD**.
 
 ## Required closure for a future retry
 
