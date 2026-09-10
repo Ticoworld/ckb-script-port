@@ -43,10 +43,13 @@ installation by a debuggable build from the pinned Pocket checkout. The device
 reported model `SM-S9180`, ABI `arm64-v8a`, and SDK 36. `run-as` was available
 for the debug package, while the original release package was not debuggable.
 
-A new wallet was created through Pocket's actual UI. No mnemonic, private key,
-PIN hash, Android keystore material, `key_material` blob, or native
-`secret_key` file was extracted or stored in the repository. The wallet remains
-usable only through the device's normal authentication/recovery flow.
+A new wallet was created through Pocket's actual UI. No plaintext mnemonic,
+private key, PIN hash, Android keystore material, or native `secret_key` file
+was extracted. The temporary local Room database capture necessarily contains
+Pocket's encrypted `key_material` row so that the disposable app database
+could be staged and inspected; it is untracked test material, was never
+committed, and was not decrypted. The wallet remains usable through the
+device's normal authentication/recovery flow.
 
 The captured wallet's exact registered identity was:
 
