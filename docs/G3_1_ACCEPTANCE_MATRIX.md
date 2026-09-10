@@ -2,7 +2,7 @@
 
 **Date:** 10 September 2026
 **G3-0 checkpoint:** `b86e0a958d50a676c3e062419d4c1194c2b342c3`  
-**G3-1 result:** **HOLD**
+**G3-1 result:** **HOLD** for the broader exploratory matrix; **G3-1R1 PASS** for the required Pocket executable reference-flow closure
 
 This matrix is intentionally binary. A G3-1 PASS requires every required row
 to be PASS. A G3-0 selection, source inspection, or D2-only test is not a
@@ -35,21 +35,41 @@ substitute for Pocket execution.
 
 ## G3-1R1 update (10 September 2026)
 
-G3-1R1 changed the evidence state for the profile/source/export portions of
-the matrix. The original rows above preserve the historical G3-1 starting
-record; the current interpretation is:
+G3-1R1 closes the Pocket execution hold. The original rows above preserve the
+historical G3-1 starting record; the current executable results below are the
+normative R1 evidence. The broader G3-1 matrix remains HOLD only because the
+exploratory multi-Script row is not part of the frozen one-Script R1 seam.
 
 | Row | Current result | Current evidence |
 |---:|---|---|
 | 5 | PASS | New explicit `pocket-sqlite` `PocketSqliteAdapter`, profile `pocket-node@6eda0b7.../ckb-light-client@0.5.4/kv-v1`, and production conformance test. |
-| 6 | PASS with zero-closure qualification | Real UI-created wallet and captured 10,215-row Pocket `store.db`; exact 73-byte lock Script registration and H=20,410,406 exist, but selected index/transaction/closure counts are zero. |
-| 7 | HOLD | The initial no-D2 control was not unlocked after staging; Pocket reported `scriptBlock=0`, so filter-hash traffic is not counted as an exact-Script refilter control. |
-| 8 | PASS with zero-closure qualification | Production `D2::export` against the captured Pocket source emitted H=20,410,406 and a 299-byte zero-closure artifact. |
-| 9 | HOLD | Host-side Pocket `kv` import/reopen passed, but no fresh Android Pocket application destination was executed. |
-| 10–21 | HOLD | No Android D2 import, request trace, Room rebuild, post-H exact-Script result, restart-after-import, measurement, or alternative timing was completed. |
+| 6 | PASS | Real UI-created wallet and captured 11,205-row testnet Pocket `store.db`; exact 73-byte lock Script registration, two selected index rows, two transaction-index rows, and two closure transactions. |
+| 7 | PASS | Unlocked no-D2 retry registered the exact Script at H-17 and the pinned upstream requested filters starting at 20,410,390, through H. |
+| 8 | PASS | Production `D2::export` against the real testnet source emitted H=22,370,055 and a 1,767-byte artifact with two index rows, two transaction-index rows, and two closure transactions. |
+| 9 | PASS with boundary qualification | Production D2 imported a newly created Pocket `kv` destination on the host; the resulting native store was then staged into the debug Pocket app. The importer itself is not linked into Pocket. |
+| 10-21 | CLOSED BY R1 | See the executable retry matrix below; rows 10-18 and 20-21 pass, while row 19 remains an exploratory broader G3-1 hold. |
 
 The full R1 record is in
 [`G3_1R1_POCKET_EXECUTION_EVIDENCE.md`](G3_1R1_POCKET_EXECUTION_EVIDENCE.md).
+
+### Current executable retry matrix
+
+| Row | Current result | Current evidence |
+|---:|---|---|
+| 7 | PASS | Unlocked no-D2 retry registered the exact Script at H-17 and requested the historical range from 20,410,390. |
+| 9 | PASS with boundary qualification | Production D2 imported a newly created Pocket `kv` destination on the host; the resulting store was staged into the debug Pocket app. |
+| 10 | PASS | Clean testnet D2 startup registered at H=22,370,055 and the first request began at 22,370,056. |
+| 11 | PASS | The no-D2 request from 20,410,390 is the negative control showing historical filtering through H. |
+| 12 | PASS | Pocket rebuilt two imported historical transactions, then three after continuation; WAL-backed Room progress persisted. |
+| 13 | PASS | Pinned upstream matched one post-H block; Pocket materialized the outgoing transaction and exact Script cells. |
+| 14 | PASS within controlled boundary | Force-stop/reopen preserved coherent native and Room state; no power-loss claim. |
+| 15 | PASS within tested boundary | Native peer/header authority remained in Pocket; source data did not become chain authority. |
+| 16 | PASS | Unrelated Pocket rows were preserved by the host import and Room/key state was outside the D2 artifact. |
+| 17 | PASS | Debug target ran on Samsung SM-S9180, arm64-v8a, SDK 36. |
+| 18 | PASS with boundary qualification | Testnet Pocket restart/rebuild was measured at 142 ms start invocation and 293,146 kB PSS / 416,108 kB RSS; D2 import timing was host-side. |
+| 19 | HOLD | Only one real wallet Script was exercised. |
+| 20 | PASS with boundary qualification | Full Pocket store+Room copy was timed; existing key backup was confirmed not to migrate LC history. |
+| 21 | PASS within tested boundary | The constrained real flow supports the frozen product boundary. |
 
 ## Commands and observed runtime evidence
 
@@ -89,17 +109,18 @@ Observed: `run-as: package not debuggable: com.rjnr.pocketnode`. This prevented
 safe extraction or replacement of the private LC and Room files on the
 unrooted device.
 
-### Debug-build attempts
+### Debug build and executable retry
 
 ```powershell
 .\gradlew.bat :app:assembleDebug
 ```
 
-Failed at `:app:cargoBuild` while starting `./build-android-jni.sh` on Windows.
-The separated Git Bash/Cargo attempts then failed on the repository script's
-global Android flags/host linking setup, missing Android `ifaddrs.h` for the
-stub, missing MSVC `link.exe`, and missing GNU `-lgcc` libraries. No debug APK
-was produced.
+The initial direct Windows build failed at `:app:cargoBuild` while starting
+`./build-android-jni.sh`; the separated host/Git-Bash attempts exposed the
+Android toolchain limitations recorded in the earlier evidence. A subsequent
+debug build was produced and installed from
+`android/app/build/outputs/apk/debug/app-debug.apk`. `run-as` then worked,
+allowing disposable Pocket store/Room staging and the unlocked runtime retry.
 
 ## Matrix counts
 
@@ -116,25 +137,18 @@ starting checkpoint.
 
 ### Current G3-1R1 counts
 
-Counting the R1 updates above as binary requirement results gives **7 PASS / 15
-HOLD / 0 FAIL**. The zero-closure qualifications do not upgrade the missing
-Android lifecycle rows. G3-1R1 therefore remains **HOLD**.
+Counting the current executable retry matrix as binary requirement results
+gives **21 PASS / 1 HOLD / 0 FAIL**. The sole remaining HOLD is the
+exploratory multi-Script practicality row, which is outside the frozen
+one-Script R1 closure. Therefore **G3-1R1 PASS**; the broader exploratory
+G3-1 matrix remains HOLD.
 
-## Required closure for a future retry
+## Remaining broader G3-1 exploration
 
-The retry must produce, from the actual Pocket filtering path:
-
-1. a real wallet-derived exact packed lock Script and role;
-2. a Script-bearing source `store.db` with H and matched history;
-3. an explicit Pocket `kv` profile adapter or a proved-compatible existing
-   adapter;
-4. a no-D2 exact-Script historical-filter positive control;
-5. production D2 export and import into a fresh Pocket destination;
-6. request instrumentation showing no Script filtering through H after import;
-7. Room reconstruction from imported local LC state;
-8. post-H Pocket balance/history continuation;
-9. restart/process-death coherence;
-10. device-level import/reconciliation resource measurements.
+G3-1R1 has no required closure item remaining. The broader G3-1 matrix may
+still investigate multi-Script practicality if that exploratory question is
+kept in scope. Such work must not change D2 v1's one-Script artifact or add
+Pocket application integration that is absent from the selected checkout.
 
 If Room or Pocket startup necessarily rewinds and refilters the Script through
 H, the hypothesis fails. It must not be hidden as ordinary application
