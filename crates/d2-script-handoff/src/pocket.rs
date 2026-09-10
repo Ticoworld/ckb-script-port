@@ -29,6 +29,7 @@ pub const POCKET_PROFILE: &str =
     "pocket-node@6eda0b7a4601050b011591d41cc702f0dc7a7c38/ckb-light-client@0.5.4/kv-v1";
 
 const LAST_STATE_KEY: &str = "LAST_STATE";
+const LAST_N_HEADERS_KEY: &str = "LAST_N_HEADERS";
 const GENESIS_BLOCK_KEY: &str = "GENESIS_BLOCK";
 const FILTER_SCRIPTS_KEY: &str = "FILTER_SCRIPTS";
 const MIN_FILTERED_NUMBER_KEY: &str = "MIN_FILTERED_NUMBER";
@@ -677,6 +678,19 @@ fn read_block_hash(adapter: &PocketSqliteAdapter, height: u64) -> Result<[u8; 32
         }
         return Ok(value.try_into().unwrap());
     }
+    if let Some(value) = adapter.read(&Key::Meta(LAST_N_HEADERS_KEY).into_vec())? {
+        if value.len() % 40 != 0 {
+            return Err(D2Error::HandoffMismatch(
+                "Pocket LAST_N_HEADERS has invalid length".into(),
+            ));
+        }
+        for header in value.chunks_exact(40) {
+            let number = u64::from_le_bytes(header[..8].try_into().unwrap());
+            if number == height {
+                return Ok(header[8..].try_into().unwrap());
+            }
+        }
+    }
     let value = adapter
         .read(&Key::Meta(LAST_STATE_KEY).into_vec())?
         .ok_or_else(|| {
@@ -780,6 +794,10 @@ mod tests {
             .collect()
     }
 
+    fn hex_encode(input: &[u8]) -> String {
+        input.iter().map(|byte| format!("{byte:02x}")).collect()
+    }
+
     /// Executes the production Pocket adapter against a genuine captured
     /// Pocket store. The destination is a disposable authority-preserving
     /// SQLite copy with only the selected Script registration removed.
@@ -817,22 +835,27 @@ mod tests {
         drop(conn);
 
         let source = PocketSqliteAdapter::open(&source_path).unwrap();
+        eprintln!("pocket-source tip={}", read_tip_height(&source).unwrap());
         let exported = crate::D2::new(source)
             .export(&script, ScriptRole::Lock)
             .unwrap();
         assert_eq!(exported.artifact.adapter_profile, POCKET_PROFILE);
-        assert_eq!(exported.artifact.index_rows.len(), 0);
-        assert_eq!(exported.artifact.transaction_index_rows.len(), 0);
-        assert_eq!(exported.artifact.transaction_rows.len(), 0);
+        assert!(!exported.artifact.index_rows.is_empty());
+        assert!(!exported.artifact.transaction_index_rows.is_empty());
+        assert!(!exported.artifact.transaction_rows.is_empty());
         eprintln!(
-            "pocket-export profile={} handoff_height={} index_rows={} transaction_index_rows={} transaction_rows={} artifact_bytes={}",
+            "pocket-export profile={} handoff_height={} handoff_hash=0x{} index_rows={} transaction_index_rows={} transaction_rows={} artifact_bytes={}",
             exported.artifact.adapter_profile,
             exported.artifact.handoff_height,
+            hex_encode(&exported.artifact.handoff_hash),
             exported.artifact.index_rows.len(),
             exported.artifact.transaction_index_rows.len(),
             exported.artifact.transaction_rows.len(),
             exported.bytes.len(),
         );
+        if let Ok(path) = std::env::var("D2_POCKET_ARTIFACT") {
+            fs::write(path, &exported.bytes).unwrap();
+        }
 
         let destination = PocketSqliteAdapter::open_exclusive(&destination_path).unwrap();
         let d2 = crate::D2::new(destination);
