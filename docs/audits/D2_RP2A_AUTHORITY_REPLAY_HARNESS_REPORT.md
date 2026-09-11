@@ -17,7 +17,7 @@ cursor, a minimum, or an apparent tip exist.
 
 ## 2. Project starting checkpoint
 
-Project: `C:\Users\timot\Desktop\2026\CKB\ckb-script-port`
+Project: this repository (machine-local path omitted)
 
 At the beginning of RP2-A this directory was not a Git repository. Its
 material tracked contents were the two completed audit documents. The project
@@ -805,7 +805,7 @@ deviation is a release error, not experimental evidence.
 `grant_find` itself was treated read-only throughout RP2-A. Its nested research
 repository remains:
 
-`C:\Users\timot\Desktop\2026\CKB\grant_find\d2-portability-proof`
+the separate `grant_find` research checkout (machine-local path omitted)
 
 * branch: `main`;
 * HEAD: `bec39d6764e2622139d4f0a93613126f64d4f5a5`;

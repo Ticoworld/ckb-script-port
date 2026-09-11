@@ -26,7 +26,7 @@ reorg-safety result.
 
 ## 2. Checkpoints and scope
 
-Project: `C:\Users\timot\Desktop\2026\CKB\ckb-script-port`
+Project: this repository (machine-local path omitted)
 
 Pinned upstream system under test:
 

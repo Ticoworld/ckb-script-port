@@ -76,8 +76,8 @@ The review used:
 
 1. Current public repository pages, source files, release pages, issues, and
    merged pull requests.
-2. The local provenance checkouts under
-   `C:\Users\timot\Desktop\2026\CKB\grant_find\ckb-boundary-probes`.
+2. The local provenance checkouts used during review (their machine-local
+   paths are intentionally omitted here).
 3. The checked-in D-BOOTSTRAP Probe 4 and PV1 evidence manifests.
 4. Read-only local `git`, `rg`, and file inspection commands.
 

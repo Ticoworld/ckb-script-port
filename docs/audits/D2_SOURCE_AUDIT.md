@@ -1,7 +1,7 @@
 # D2 Source Archaeology + Technical Evidence Audit
 
 Audit date: 2026-08-30  
-Source repository: the separate grant_find research checkout  
+Source repository: separate `grant_find` research checkout
 New project: this repository
 
 ## 1. Verdict

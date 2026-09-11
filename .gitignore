@@ -29,3 +29,21 @@ __pycache__/
 *.swp
 Thumbs.db
 Desktop.ini
+
+# Local runtime captures and credentials. These are never public fixtures.
+*.apk
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.log
+*.dmp
+*.dump
+*.env
+*.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore

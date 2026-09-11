@@ -167,7 +167,9 @@ Project HEAD remains `f0117229a6cb684c76bb46b32a40b80ae7c39ff4`. The worktree is
 
 ## 34. `grant_find` cleanliness
 
-Research reference `C:\Users\timot\Desktop\2026\CKB\grant_find\d2-portability-proof` remains clean at `bec39d6764e2622139d4f0a93613126f64d4f5a5`. No research-reference file was modified.
+The separate `grant_find` research reference remains clean at
+`bec39d6764e2622139d4f0a93613126f64d4f5a5`. No research-reference file was
+modified.
 
 ## 35. Final recommendation
 
