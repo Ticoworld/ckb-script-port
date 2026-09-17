@@ -148,9 +148,14 @@ Median rescan times were:
 | unique stress | 2.63 s | 7.15 s |
 | shared stress | 5.82 s | 13.07 s |
 
-D2 transfer is clearly cheaper than replay for sparse histories and the larger
-stress shapes when the source state already exists. At moderate/dense sizes,
-SQLite import and reopen can approach or exceed this local replay comparator.
+D2's complete measured path—export, inspect, validate, import, and reopen—wins
+the published control and sparse local replay cases, but loses the moderate,
+dense, unique-stress, and shared-stress local replay cases on both measured
+backends. This comparator is local `filter_block` replay, not a complete
+protocol or network resynchronization benchmark. D2 is conditionally
+beneficial: avoided historical work and selective exact-Script portability are
+not equivalent to guaranteed lower wall-clock time and can be outweighed by
+validation, import, reopen, or storage costs.
 The correct product conclusion is **CONDITIONALLY BENEFICIAL**, not “always
 faster.” D2's additional value is avoiding repeated historical protocol work,
 selecting one exact Script, preserving destination chain authority, and
