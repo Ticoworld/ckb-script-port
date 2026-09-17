@@ -82,6 +82,12 @@ creation once per repetition before client timing, validates the filter cache,
 uses the public export identity/backend/row checks, and uses fresh source,
 baseline, and D2 storage directories.
 
+Summarize a completed scenario without external Python packages:
+
+```bash
+python3 benchmarks/ev1/r4/parse-results.py /tmp/ev1-r4-run/sparse
+```
+
 ## Frozen fixtures
 
 H36 sanity fixture:
