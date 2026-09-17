@@ -14,7 +14,9 @@ performance guarantee.
 - Upstream revision: `12e29522ab7e078ada704d4ac04cbc0498009b7b`
 - Backend: SQLite (`--no-default-features --features sqlite`)
 - Linux/WSL2 with Bash, GNU coreutils, Rust/Cargo, and a working C compiler.
-- The benchmark was exercised under Ubuntu in WSL2 with Rust 1.96.
+- The fresh-clone reproduction used Ubuntu in WSL2; the upstream checkout
+  selected its pinned Rust 1.95.0 toolchain and the D2 checkout used installed
+  stable Rust 1.98.1.
 
 ## Clean setup
 
