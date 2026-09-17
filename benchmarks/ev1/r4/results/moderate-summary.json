@@ -1,0 +1,31 @@
+{
+  "scenario": "moderate",
+  "workload": "CONTROLLED-MODERATE-CONTROL",
+  "handoff_height": 5000,
+  "historical_matching_blocks": 498,
+  "historical_transactions": 996,
+  "indexed_rows": 3984,
+  "artifact_bytes": 1309010,
+  "raw_seconds": {
+    "baseline_destination": [30.22, 28.49, 28.62],
+    "d2_destination": [6.29, 6.82, 6.27],
+    "d2_total_transfer": [6.42, 6.97, 6.41]
+  },
+  "median_seconds": {
+    "baseline_destination": 28.62,
+    "d2_destination": 6.29,
+    "d2_total_transfer": 6.42,
+    "destination_saving": 22.33,
+    "total_transfer_saving": 22.2
+  },
+  "ratios": {
+    "d2_destination_over_baseline": 0.2198,
+    "d2_total_over_baseline": 0.2243
+  },
+  "protocol_work_avoided": {
+    "historical_filter_blocks": 5000,
+    "historical_matching_blocks": 498,
+    "d2_first_request": 5001
+  },
+  "caveat": "Controlled fixture measurement; timing is environment-specific and does not establish faster post-H processing or a universal speed claim."
+}
