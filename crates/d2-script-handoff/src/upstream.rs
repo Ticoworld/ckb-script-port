@@ -24,6 +24,8 @@ use crate::{
 pub const UPSTREAM_PROFILE: &str =
     "ckb-light-client@12e29522ab7e078ada704d4ac04cbc0498009b7b/storage-v1";
 
+const LAST_N_HEADERS_KEY: &str = "LAST_N_HEADERS";
+
 #[cfg(feature = "rocksdb")]
 /// Native RocksDB storage type from the supported upstream profile.
 pub type RocksDbStorage = ckb_light_client_lib::storage::Storage;
@@ -692,12 +694,20 @@ where
         return Ok(value.try_into().unwrap());
     }
 
-    // The live pinned light-client proof path may retain the accepted tip in
-    // LAST_STATE without retaining a full BlockNumber index for that height.
-    // A handoff at the destination's current tip can therefore use the
-    // independently stored LAST_STATE header as its authority fact.  This
-    // fallback is deliberately limited to the matching tip height; it does
-    // not make source headers authoritative or reconstruct arbitrary history.
+    if let Some(headers) = backend_get(storage, Key::Meta(LAST_N_HEADERS_KEY).into_vec())? {
+        if headers.len() % 40 != 0 {
+            return Err(D2Error::HandoffMismatch(
+                "stored recent-header list has invalid length".into(),
+            ));
+        }
+        for header in headers.chunks_exact(40) {
+            let header_height = u64::from_le_bytes(header[..8].try_into().unwrap());
+            if header_height == height {
+                return Ok(header[8..].try_into().unwrap());
+            }
+        }
+    }
+
     let last_state = backend_get(
         storage,
         Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec(),
@@ -1483,6 +1493,182 @@ mod tests {
             batch.commit().unwrap();
         }
         (storage, script.as_slice().to_vec())
+    }
+
+    fn empty_test_storage(path: &Path) -> Storage {
+        let storage = Storage::new(path);
+        let genesis = packed::Block::new_builder()
+            .header(
+                packed::Header::new_builder()
+                    .raw(packed::RawHeader::new_builder().number(0u64).build())
+                    .build(),
+            )
+            .build();
+        storage.init_genesis_block(genesis);
+        storage
+    }
+
+    fn store_test_tip(storage: &Storage, height: u64) -> packed::Header {
+        let header = packed::Header::new_builder()
+            .raw(packed::RawHeader::new_builder().number(height).build())
+            .build();
+        let mut last_state = vec![0u8; 32];
+        last_state.extend_from_slice(header.as_slice());
+        let mut batch = storage.batch();
+        batch.put(
+            &Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec(),
+            &last_state,
+        );
+        batch.commit().unwrap();
+        header
+    }
+
+    #[test]
+    fn resolves_block_number_mapping_before_fallbacks() {
+        let directory = tempdir().unwrap();
+        let (storage, _) = fixture_storage_at(directory.path(), false, 72_000);
+        let hash = read_block_hash(&storage, 72_000).unwrap();
+        let expected = backend_get(&storage, Key::BlockNumber(72_000).into_vec())
+            .unwrap()
+            .unwrap();
+        assert_eq!(hash.as_slice(), expected.as_slice());
+    }
+
+    #[test]
+    fn resolves_exact_height_from_recent_headers() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        let header = packed::Header::new_builder()
+            .raw(packed::RawHeader::new_builder().number(72_000).build())
+            .build();
+        store_test_tip(&storage, 72_010);
+        let mut recent_headers = Vec::new();
+        recent_headers.extend_from_slice(&72_000u64.to_le_bytes());
+        recent_headers.extend_from_slice(header.calc_header_hash().as_slice());
+        let mut batch = storage.batch();
+        batch.put(&Key::Meta(LAST_N_HEADERS_KEY).into_vec(), &recent_headers);
+        batch.commit().unwrap();
+
+        assert!(backend_get(&storage, Key::BlockNumber(72_000).into_vec())
+            .unwrap()
+            .is_none());
+        let expected: [u8; 32] = header.calc_header_hash().as_slice().try_into().unwrap();
+        assert_eq!(read_block_hash(&storage, 72_000).unwrap(), expected);
+    }
+
+    #[test]
+    fn rejects_recent_header_candidate_at_the_wrong_height() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        let header = packed::Header::new_builder()
+            .raw(packed::RawHeader::new_builder().number(71_999).build())
+            .build();
+        store_test_tip(&storage, 72_010);
+        let mut recent_headers = Vec::new();
+        recent_headers.extend_from_slice(&71_999u64.to_le_bytes());
+        recent_headers.extend_from_slice(header.calc_header_hash().as_slice());
+        let mut batch = storage.batch();
+        batch.put(&Key::Meta(LAST_N_HEADERS_KEY).into_vec(), &recent_headers);
+        batch.commit().unwrap();
+
+        assert!(matches!(
+            read_block_hash(&storage, 72_000),
+            Err(D2Error::HandoffMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn resolves_tip_header_when_height_matches() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        let tip = store_test_tip(&storage, 72_000);
+        assert!(backend_get(&storage, Key::BlockNumber(72_000).into_vec())
+            .unwrap()
+            .is_none());
+        let expected: [u8; 32] = tip.calc_header_hash().as_slice().try_into().unwrap();
+        assert_eq!(read_block_hash(&storage, 72_000).unwrap(), expected);
+    }
+
+    #[test]
+    fn missing_boundary_hash_fails_closed() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        let mut batch = storage.batch();
+        batch.delete(&Key::Meta(ckb_light_client_lib::storage::LAST_STATE_KEY).into_vec());
+        batch.commit().unwrap();
+
+        assert!(matches!(
+            read_block_hash(&storage, 72_000),
+            Err(D2Error::HandoffMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_tip_header_at_the_wrong_height() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        store_test_tip(&storage, 72_001);
+
+        assert!(matches!(
+            read_block_hash(&storage, 72_000),
+            Err(D2Error::HandoffMismatch(_))
+        ));
+    }
+
+    #[test]
+    fn sparse_filter_cursor_without_boundary_header_fails_closed() {
+        let directory = tempdir().unwrap();
+        let storage = empty_test_storage(directory.path());
+        let handoff_height = 72_000u64;
+        let tip_height = 22_588_651u64;
+        let script = packed::Script::new_builder()
+            .code_hash(packed::Byte32::from_slice(&[9u8; 32]).unwrap())
+            .build();
+        let registration = filter_script_key(&script, ScriptRole::Lock);
+        let mut batch = storage.batch();
+        batch.put(&registration, &0u64.to_be_bytes());
+        batch.commit().unwrap();
+
+        storage.update_block_number(handoff_height);
+        storage.update_min_filtered_block_number(handoff_height);
+        store_test_tip(&storage, tip_height);
+
+        let mut recent_headers = Vec::new();
+        for height in (tip_height - 99)..=tip_height {
+            let header = packed::Header::new_builder()
+                .raw(packed::RawHeader::new_builder().number(height).build())
+                .build();
+            recent_headers.extend_from_slice(&height.to_le_bytes());
+            recent_headers.extend_from_slice(header.calc_header_hash().as_slice());
+        }
+        let mut batch = storage.batch();
+        batch.put(&Key::Meta(LAST_N_HEADERS_KEY).into_vec(), &recent_headers);
+        batch.commit().unwrap();
+
+        assert_eq!(
+            exact_status(&storage, script.as_slice(), ScriptRole::Lock).unwrap(),
+            Some(handoff_height)
+        );
+        assert!(
+            backend_get(&storage, Key::BlockNumber(handoff_height).into_vec())
+                .unwrap()
+                .is_none()
+        );
+        let (index_rows, transaction_index_rows, transaction_rows) = collect_rows(
+            &storage,
+            &script,
+            ScriptRole::Lock,
+            &ResourceLimits::default(),
+        )
+        .unwrap();
+        assert!(index_rows.is_empty());
+        assert!(transaction_index_rows.is_empty());
+        assert!(transaction_rows.is_empty());
+        assert!(matches!(
+            crate::D2::new(UpstreamAdapter::new(storage, directory.path()))
+                .export(script.as_slice(), ScriptRole::Lock),
+            Err(D2Error::HandoffMismatch(_))
+        ));
     }
 
     #[test]
